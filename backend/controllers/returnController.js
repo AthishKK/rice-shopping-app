@@ -79,3 +79,75 @@ exports.updateReturnStatus = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Admin: get return analytics
+exports.getReturnAnalytics = async (req, res) => {
+  try {
+    const [totalReturns, statusBreakdown, refundStats, monthlyReturns] = await Promise.all([
+      // Total returns count
+      Return.countDocuments(),
+      
+      // Returns by status
+      Return.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+      ]),
+      
+      // Refund statistics
+      Return.aggregate([
+        {
+          $match: {
+            status: { $in: ["Refund Processed", "Replacement Shipped"] }
+          }
+        },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "orderId",
+            foreignField: "_id",
+            as: "order"
+          }
+        },
+        { $unwind: "$order" },
+        {
+          $group: {
+            _id: null,
+            totalRefunded: { $sum: "$order.totalAmount" },
+            refundCount: { $sum: 1 }
+          }
+        }
+      ]),
+      
+      // Monthly return trends
+      Return.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 6)) }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } }
+      ])
+    ]);
+
+    const refundData = refundStats[0] || { totalRefunded: 0, refundCount: 0 };
+    
+    res.json({
+      totalReturns,
+      statusBreakdown,
+      totalRefunded: refundData.totalRefunded,
+      totalRefundCount: refundData.refundCount,
+      monthlyReturns
+    });
+  } catch (err) {
+    console.error("Return analytics error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

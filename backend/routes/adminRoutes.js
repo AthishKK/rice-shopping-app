@@ -20,7 +20,7 @@ const {
   createOffer, getAllOffers, toggleOfferStatus
 } = require("../controllers/adminController");
 
-const { getAllReturns, getReturnDetails, updateReturnStatus } = require("../controllers/returnController");
+const { getAllReturns, getReturnDetails, updateReturnStatus, getReturnAnalytics } = require("../controllers/returnController");
 const { getAllReviews, toggleReviewVisibility, deleteReview } = require("../controllers/reviewController");
 
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -80,6 +80,7 @@ router.put("/offers/:offerId/toggle", toggleOfferStatus);
 
 // Returns Management
 router.get("/returns", getAllReturns);
+router.get("/returns/analytics", getReturnAnalytics);
 router.get("/returns/:returnId", getReturnDetails);
 router.put("/returns/:returnId/status", updateReturnStatus);
 

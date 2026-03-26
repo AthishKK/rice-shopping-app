@@ -202,6 +202,14 @@ function AdminPanel() {
           case 'analytics':
             const analyticsData = await adminAPI('/dashboard');
             setStats(analyticsData);
+            
+            // Load return analytics
+            try {
+              const returnAnalytics = await adminAPI('/returns/analytics');
+              setStats(prev => ({ ...prev, returnAnalytics }));
+            } catch (err) {
+              console.error('Failed to load return analytics:', err);
+            }
             break;
             
           case 'returns':
@@ -2179,7 +2187,8 @@ function AdminPanel() {
             backgroundColor: 'white',
             padding: '20px',
             borderRadius: '10px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            marginBottom: '20px'
           }}>
             <h3 style={{ marginTop: '0', color: '#333' }}>⚙️ System Health</h3>
             
@@ -2212,6 +2221,78 @@ function AdminPanel() {
               </div>
             </div>
           </div>
+          
+          {/* Return Analytics */}
+          {stats.returnAnalytics && (
+            <div style={{
+              backgroundColor: 'white',
+              padding: '20px',
+              borderRadius: '10px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <h3 style={{ marginTop: '0', color: '#333' }}>🔄 Return & Refund Analytics</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ padding: '20px', backgroundColor: '#ffebee', borderRadius: '10px', border: '2px solid #f44336' }}>
+                  <div style={{ fontSize: '14px', color: '#c62828', marginBottom: '5px' }}>TOTAL RETURNS</div>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#c62828' }}>{stats.returnAnalytics.totalReturns || 0}</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>All time returns</div>
+                </div>
+                
+                <div style={{ padding: '20px', backgroundColor: '#fff3e0', borderRadius: '10px', border: '2px solid #ff9800' }}>
+                  <div style={{ fontSize: '14px', color: '#f57c00', marginBottom: '5px' }}>TOTAL REFUNDED</div>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f57c00' }}>₹{stats.returnAnalytics.totalRefunded || 0}</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Amount refunded</div>
+                </div>
+                
+                <div style={{ padding: '20px', backgroundColor: '#e8f5e9', borderRadius: '10px', border: '2px solid #4caf50' }}>
+                  <div style={{ fontSize: '14px', color: '#2e7d32', marginBottom: '5px' }}>REFUND COUNT</div>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2e7d32' }}>{stats.returnAnalytics.totalRefundCount || 0}</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Orders refunded</div>
+                </div>
+                
+                <div style={{ padding: '20px', backgroundColor: '#f3e5f5', borderRadius: '10px', border: '2px solid #9c27b0' }}>
+                  <div style={{ fontSize: '14px', color: '#7b1fa2', marginBottom: '5px' }}>AVG REFUND</div>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#7b1fa2' }}>
+                    ₹{stats.returnAnalytics.totalRefundCount > 0 ? Math.round(stats.returnAnalytics.totalRefunded / stats.returnAnalytics.totalRefundCount) : 0}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Per refund</div>
+                </div>
+              </div>
+              
+              {/* Return Status Breakdown */}
+              {stats.returnAnalytics.statusBreakdown && stats.returnAnalytics.statusBreakdown.length > 0 && (
+                <div>
+                  <h4 style={{ color: '#333', marginBottom: '15px' }}>Return Status Breakdown</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                    {stats.returnAnalytics.statusBreakdown.map((status, index) => {
+                      const colors = {
+                        'Requested': '#2196f3',
+                        'Approved': '#4caf50',
+                        'Rejected': '#f44336',
+                        'Pickup Scheduled': '#ff9800',
+                        'Picked Up': '#9c27b0',
+                        'Refund Processed': '#00bcd4',
+                        'Replacement Shipped': '#795548'
+                      };
+                      return (
+                        <div key={index} style={{
+                          textAlign: 'center',
+                          padding: '15px',
+                          backgroundColor: colors[status._id] || '#666',
+                          color: 'white',
+                          borderRadius: '8px'
+                        }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{status.count}</div>
+                          <div style={{ fontSize: '12px', textTransform: 'uppercase' }}>{status._id}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

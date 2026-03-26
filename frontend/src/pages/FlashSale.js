@@ -33,9 +33,12 @@ function FlashSale() {
               id: p._id,
               name: p.name,
               images: staticMatch?.images || [],
-              originalPrice: p.pricing?.basePrice || 0,
-              finalPrice: p.pricing?.finalPrice || p.effectivePrice || 0,
-              flashSaleDiscount: p.flashSaleDiscount,
+              originalPrice: p.pricing?.originalPricePerKg || p.pricing?.basePrice || 0,
+              finalPrice: p.pricing?.pricePerKg || p.pricing?.finalPrice || 0,
+              flashSaleDiscount: p.flashSaleDiscount || 0,
+              festivalDiscount: p.festivalDiscount || 0,
+              discountType: p.pricing?.discountType || 'none',
+              appliedDiscount: p.pricing?.appliedDiscount || 0,
               flashSaleEnd: new Date(Date.now() + 6 * 60 * 60 * 1000)
             };
           });
@@ -160,7 +163,9 @@ function FlashSale() {
                   {product.images[0] && <img src={product.images[0]} alt={product.name} />}
                   <h3>{product.name}</h3>
                   <div style={{background:'#e65100',color:'#fff',padding:'4px 10px',borderRadius:'12px',display:'inline-block',marginBottom:'6px',fontWeight:'bold'}}>
-                    🔥 {product.flashSaleDiscount}% OFF
+                    {product.discountType === 'flashSale' ? `🔥 ${product.appliedDiscount}% OFF` : 
+                     product.discountType === 'festival' ? `🎉 ${product.appliedDiscount}% OFF` : 
+                     `🔥 ${product.flashSaleDiscount}% OFF`}
                   </div>
                   <div className="flash-price">
                     <span className="original">₹{product.originalPrice}</span>

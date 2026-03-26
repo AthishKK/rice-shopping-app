@@ -1564,6 +1564,51 @@ function AdminPanel() {
               <h3 style={{ margin: '0', color: '#333' }}>Festivals ({festivals.length})</h3>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
+                  onClick={() => {
+                    const name = prompt('Festival Name:');
+                    if (!name) return;
+                    const startMonth = parseInt(prompt('Start Month (1-12):')) - 1;
+                    const startDay = parseInt(prompt('Start Day (1-31):'));
+                    const endMonth = parseInt(prompt('End Month (1-12):')) - 1;
+                    const endDay = parseInt(prompt('End Day (1-31):'));
+                    const discount = parseInt(prompt('Discount Percentage (1-50):'));
+                    const bannerText = prompt('Banner Text:') || `${name} Special - ${discount}% Off!`;
+                    
+                    if (isNaN(startMonth) || isNaN(startDay) || isNaN(endMonth) || isNaN(endDay) || isNaN(discount)) {
+                      alert('Please enter valid numbers for dates and discount');
+                      return;
+                    }
+                    
+                    if (discount < 1 || discount > 50) {
+                      alert('Discount must be between 1-50%');
+                      return;
+                    }
+                    
+                    createFestival({
+                      name,
+                      startMonth,
+                      startDay,
+                      endMonth,
+                      endDay,
+                      discount,
+                      bannerText,
+                      isActive: true
+                    });
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#4caf50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🎆 Add New Festival
+                </button>
+                <button
                   onClick={applyFestivalNow}
                   style={{
                     padding: '8px 16px',

@@ -19,10 +19,22 @@ const getFinalPrice = async (product, age, weight = "1kg") => {
     // Base calculation: Market Price + Rice Type Premium + Age Premium
     const basePrice = market.pricePerKg + product.basePremium + agePremium;
     
-    // Apply flash sale discount if applicable
+    // Apply discounts in priority order: Flash Sale > Festival > Base
     let finalPrice = basePrice;
+    let appliedDiscount = 0;
+    let discountType = "none";
+    
+    // 1. Flash Sale (highest priority)
     if (product.isFlashSale && product.flashSaleDiscount > 0) {
       finalPrice = basePrice * (1 - product.flashSaleDiscount / 100);
+      appliedDiscount = product.flashSaleDiscount;
+      discountType = "flashSale";
+    }
+    // 2. Festival Discount (if no flash sale)
+    else if (product.festivalDiscount > 0) {
+      finalPrice = basePrice * (1 - product.festivalDiscount / 100);
+      appliedDiscount = product.festivalDiscount;
+      discountType = "festival";
     }
 
     return {
@@ -32,10 +44,16 @@ const getFinalPrice = async (product, age, weight = "1kg") => {
       basePrice,
       finalPrice: Math.round(finalPrice * weightMultiplier),
       pricePerKg: Math.round(finalPrice),
+      originalPrice: Math.round(basePrice * weightMultiplier),
+      originalPricePerKg: Math.round(basePrice),
+      appliedDiscount,
+      discountType,
       trend: market.trend,
       priceChange: market.priceChange,
       isFlashSale: product.isFlashSale,
-      flashSaleDiscount: product.flashSaleDiscount
+      flashSaleDiscount: product.flashSaleDiscount,
+      festivalDiscount: product.festivalDiscount,
+      activeFestival: product.activeFestival
     };
   } catch (error) {
     console.error("Error calculating price:", error);

@@ -38,27 +38,41 @@ const getCurrentFestival = async () => {
   try {
     await seedFestivals();
     const now = new Date();
-    const month = now.getMonth();
-    const day = now.getDate();
+    const month = now.getMonth(); // 0-11
+    const day = now.getDate(); // 1-31
+
+    console.log(`🗓️ Current date: ${day}/${month + 1} (month ${month}, day ${day})`);
 
     const festivals = await Festival.find({ isActive: true });
+    console.log(`🎉 Found ${festivals.length} active festivals in database`);
 
     for (const f of festivals) {
+      console.log(`🔍 Checking festival: ${f.name} (${f.startDay}/${f.startMonth + 1} - ${f.endDay}/${f.endMonth + 1})`);
+      
       // Handle festivals that span across year boundary (e.g. New Year Dec 30 - Jan 2)
       const startsBeforeEnd = f.startMonth < f.endMonth ||
         (f.startMonth === f.endMonth && f.startDay <= f.endDay);
 
       if (startsBeforeEnd) {
+        // Normal date range within same year
         const afterStart = month > f.startMonth || (month === f.startMonth && day >= f.startDay);
         const beforeEnd  = month < f.endMonth  || (month === f.endMonth  && day <= f.endDay);
-        if (afterStart && beforeEnd) return f;
+        if (afterStart && beforeEnd) {
+          console.log(`✅ Active festival found: ${f.name}`);
+          return f;
+        }
       } else {
         // Wraps year: e.g. Dec 30 → Jan 2
         const afterStart = month > f.startMonth || (month === f.startMonth && day >= f.startDay);
         const beforeEnd  = month < f.endMonth   || (month === f.endMonth  && day <= f.endDay);
-        if (afterStart || beforeEnd) return f;
+        if (afterStart || beforeEnd) {
+          console.log(`✅ Active festival found (year wrap): ${f.name}`);
+          return f;
+        }
       }
     }
+    
+    console.log(`❌ No active festival found for current date`);
     return null;
   } catch (err) {
     console.error("Error getting current festival:", err);

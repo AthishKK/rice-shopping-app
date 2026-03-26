@@ -141,45 +141,8 @@ function AdminPanel() {
                 // Backup successful stock data
                 backupStocks(stocksData);
               } else {
-                console.warn('No stocks data received, attempting initialization...');
-                
-                // Try to initialize stocks first
-                try {
-                  const initResponse = await adminAPI('/stocks/initialize-all', {
-                    method: 'POST'
-                  });
-                  console.log('Stock initialization response:', initResponse);
-                  
-                  // Try loading stocks again after initialization
-                  const newStocksData = await adminAPI('/stocks');
-                  if (Array.isArray(newStocksData) && newStocksData.length > 0) {
-                    setStocks(newStocksData);
-                    backupStocks(newStocksData);
-                    showMessage(`Initialized and loaded ${newStocksData.length} stock entries`, false);
-                  } else {
-                    throw new Error('Stock initialization completed but no data returned');
-                  }
-                } catch (initErr) {
-                  console.error('Stock initialization failed:', initErr);
-                  
-                  // Try to restore from backup
-                  if (hasStockBackup()) {
-                    const backupStocks = restoreStocks();
-                    if (backupStocks.length > 0) {
-                      setStocks(backupStocks);
-                      showMessage(`Restored ${backupStocks.length} stocks from backup`, false);
-                    }
-                  } else {
-                    // Generate defaults as last resort
-                    const productsForStock = await adminAPI('/products');
-                    if (productsForStock.length > 0) {
-                      const defaultStocks = generateDefaultStocks(productsForStock);
-                      setStocks(defaultStocks);
-                      backupStocks(defaultStocks);
-                      showMessage(`Generated ${defaultStocks.length} default stock entries`, false);
-                    }
-                  }
-                }
+                console.warn('No stocks data received');
+                showMessage('No stock data found. Use "Initialize All Stocks" button to create stock entries.', false);
               }
               
               // Load products for stock management
@@ -189,16 +152,16 @@ function AdminPanel() {
               
             } catch (err) {
               console.error('Failed to load stocks:', err);
-              showMessage(`Failed to load stocks: ${err.message}`, true);
+              showMessage(`Failed to load stocks: ${err.message}. Use "Initialize All Stocks" button if needed.`, true);
               
-              // Try backup recovery on API failure
-              if (hasStockBackup()) {
-                const backupStocks = restoreStocks();
-                if (backupStocks.length > 0) {
-                  setStocks(backupStocks);
-                  showMessage(`API failed, restored ${backupStocks.length} stocks from backup`, false);
-                }
-              }
+              // Only try backup recovery if explicitly requested, not automatically
+              // if (hasStockBackup()) {
+              //   const backupStocks = restoreStocks();
+              //   if (backupStocks.length > 0) {
+              //     setStocks(backupStocks);
+              //     showMessage(`API failed, restored ${backupStocks.length} stocks from backup`, false);
+              //   }
+              // }
               
               // Still try to load products
               try {
@@ -516,13 +479,14 @@ function AdminPanel() {
     }
   };
 
-  // Auto-recover stocks when stocks tab is opened and stocks are empty
-  useEffect(() => {
-    if (tab === 'stocks' && stocks.length === 0 && !loading) {
-      console.log('🔄 Auto-recovering stocks...');
-      recoverStocks();
-    }
-  }, [tab, stocks.length, loading]);
+  // Auto-recover stocks when stocks tab is opened and stocks are empty - DISABLED
+  // This was causing auto-refill issues
+  // useEffect(() => {
+  //   if (tab === 'stocks' && stocks.length === 0 && !loading) {
+  //     console.log('🔄 Auto-recovering stocks...');
+  //     recoverStocks();
+  //   }
+  // }, [tab, stocks.length, loading]);
 
   // Stock initialization function
   const initializeAllStocks = async () => {

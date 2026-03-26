@@ -6,7 +6,7 @@ const { reduceStock, restoreStock, checkStockAvailability } = require("../servic
 
 exports.createOrder = async (req, res) => {
   try {
-    const { items, totalAmount, paymentMethod, deliveryAddress } = req.body;
+    const { items, totalAmount, paymentMethod, deliveryAddress, ricePointsUsed = 0, ricePointsDiscount = 0 } = req.body;
     const userId = req.user.userId;
 
     // Resolve productIds — frontend may send static number IDs, look up real DB ObjectId by name
@@ -55,12 +55,15 @@ exports.createOrder = async (req, res) => {
       totalAmount,
       paymentMethod,
       deliveryAddress,
-      estimatedDelivery
+      estimatedDelivery,
+      ricePointsUsed,
+      ricePointsDiscount
     });
 
-    // Add rice points to user
-    const ricePoints = calculateRicePoints(totalAmount);
-    await User.findByIdAndUpdate(userId, { $inc: { ricePoints } });
+    // Add rice points to user (for new purchase) and deduct used points
+    const ricePointsEarned = calculateRicePoints(totalAmount);
+    const pointsUpdate = ricePointsEarned - ricePointsUsed;
+    await User.findByIdAndUpdate(userId, { $inc: { ricePoints: pointsUpdate } });
 
     // Reduce stock (skip free items)
     try {
@@ -76,7 +79,9 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({
       message: "Order created successfully",
       order,
-      ricePointsEarned: ricePoints,
+      ricePointsEarned,
+      ricePointsUsed,
+      netRicePointsChange: pointsUpdate,
       orderId: generateOrderId()
     });
   } catch (error) {

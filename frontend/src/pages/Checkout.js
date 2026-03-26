@@ -18,6 +18,8 @@ function Checkout() {
   const [step, setStep] = useState(1);
   const [saveAddress, setSaveAddress] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [useRicePoints, setUseRicePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState(0);
   const [deliveryAddress, setDeliveryAddress] = useState({
     fullName: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
@@ -38,7 +40,13 @@ function Checkout() {
   const subtotal = items.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
   const deliveryFee = subtotal >= 500 ? 0 : 40;
   const bundleDiscount = items.length >= 3 ? 50 : items.length >= 2 ? 20 : 0;
-  const finalPrice = subtotal - bundleDiscount + deliveryFee;
+  
+  // Rice Points Calculation
+  const userRicePoints = user?.ricePoints || 0;
+  const maxPointsUsable = Math.min(userRicePoints, Math.floor(subtotal / 2)); // Max 50% of subtotal
+  const pointsDiscount = useRicePoints ? Math.floor(pointsToUse / 2) : 0; // 2 points = ₹1
+  
+  const finalPrice = subtotal - bundleDiscount - pointsDiscount + deliveryFee;
   const ricePoints = Math.floor(finalPrice / 10);
 
   const handleAddressChange = (e) => {
@@ -60,7 +68,7 @@ function Checkout() {
 
   const handleConfirmPayment = async () => {
     const token = localStorage.getItem('token');
-    const paymentMap = { cod: 'COD', card: 'Card' };
+    const paymentMap = { cod: 'COD', upi: 'UPI', card: 'Card' };
     const isBuyNow = !!item; // buy-now passes a single item via location.state
 
     // Build order items — include free combo items as separate line items
@@ -101,7 +109,9 @@ function Checkout() {
         state: deliveryAddress.state,
         pincode: deliveryAddress.pincode,
         phone: deliveryAddress.phone
-      }
+      },
+      ricePointsUsed: useRicePoints ? pointsToUse : 0,
+      ricePointsDiscount: pointsDiscount
     };
 
     try {
@@ -200,6 +210,7 @@ function Checkout() {
           <div className="summary-totals">
             <div className="summary-row"><span>Subtotal:</span><span>₹{subtotal}</span></div>
             {bundleDiscount > 0 && <div className="summary-row discount"><span>Bundle Discount:</span><span>-₹{bundleDiscount}</span></div>}
+            {pointsDiscount > 0 && <div className="summary-row discount"><span>Rice Points Discount:</span><span>-₹{pointsDiscount}</span></div>}
             <div className="summary-row"><span>Delivery Fee:</span><span>{deliveryFee === 0 ? "FREE 🚚" : `₹${deliveryFee}`}</span></div>
             <div className="summary-row total"><span>Total:</span><span>₹{finalPrice.toFixed(2)}</span></div>
           </div>
@@ -207,6 +218,69 @@ function Checkout() {
           {bundleDiscount > 0 && (
             <div className="savings-badge">🎉 You saved ₹{bundleDiscount} with this offer!</div>
           )}
+          
+          {/* Rice Points Section */}
+          <div className="rice-points-section" style={{
+            background: 'linear-gradient(135deg, #ffd700, #ffb347)',
+            padding: '20px',
+            borderRadius: '15px',
+            margin: '20px 0',
+            border: '2px solid #ffc107'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+              <span style={{ fontSize: '24px' }}>💰</span>
+              <div>
+                <h4 style={{ margin: '0', color: '#8b4513' }}>Your Rice Points: {userRicePoints}</h4>
+                <p style={{ margin: '0', fontSize: '14px', color: '#8b4513' }}>2 points = ₹1 discount</p>
+              </div>
+            </div>
+            
+            {userRicePoints >= 2 && (
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={useRicePoints} 
+                    onChange={(e) => {
+                      setUseRicePoints(e.target.checked);
+                      if (e.target.checked) {
+                        setPointsToUse(Math.min(maxPointsUsable, userRicePoints));
+                      } else {
+                        setPointsToUse(0);
+                      }
+                    }}
+                    style={{ transform: 'scale(1.2)' }}
+                  />
+                  <span style={{ fontWeight: 'bold', color: '#8b4513' }}>Use Rice Points for discount</span>
+                </label>
+                
+                {useRicePoints && (
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', color: '#8b4513', fontWeight: 'bold' }}>
+                      Points to use: {pointsToUse} (Discount: ₹{Math.floor(pointsToUse / 2)})
+                    </label>
+                    <input 
+                      type="range" 
+                      min="2" 
+                      max={maxPointsUsable} 
+                      step="2" 
+                      value={pointsToUse} 
+                      onChange={(e) => setPointsToUse(parseInt(e.target.value))}
+                      style={{ width: '100%', marginBottom: '5px' }}
+                    />
+                    <div style={{ display: 'flex', justify: 'space-between', fontSize: '12px', color: '#8b4513' }}>
+                      <span>2 points</span>
+                      <span>{maxPointsUsable} points (max)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {userRicePoints < 2 && (
+              <p style={{ margin: '0', color: '#8b4513', fontStyle: 'italic' }}>You need at least 2 points to redeem discounts</p>
+            )}
+          </div>
 
           <div className="rewards-section">
             <span>💎</span>
@@ -233,6 +307,11 @@ function Checkout() {
               <span className="payment-icon">💵</span>
               <span>Cash on Delivery</span>
             </label>
+            <label className={`payment-option ${paymentMethod === "upi" ? "selected" : ""}`}>
+              <input type="radio" name="payment" value="upi" checked={paymentMethod === "upi"} onChange={(e) => setPaymentMethod(e.target.value)} />
+              <span className="payment-icon">📱</span>
+              <span>UPI (Google Pay, PhonePe, Paytm)</span>
+            </label>
             <label className={`payment-option ${paymentMethod === "card" ? "selected" : ""}`}>
               <input type="radio" name="payment" value="card" checked={paymentMethod === "card"} onChange={(e) => setPaymentMethod(e.target.value)} />
               <span className="payment-icon">💳</span>
@@ -248,7 +327,8 @@ function Checkout() {
           <div className="step-actions">
             <button className="back-btn" onClick={() => setStep(2)}>← Back</button>
             <button className="confirm-btn" onClick={handleConfirmPayment}>
-              {paymentMethod === "cod" ? "Confirm Order" : "Pay Now"}
+              {paymentMethod === "cod" ? "Confirm Order" : 
+               paymentMethod === "upi" ? "Pay with UPI" : "Pay Now"}
             </button>
           </div>
         </div>

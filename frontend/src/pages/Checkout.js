@@ -68,10 +68,9 @@ function Checkout() {
 
   const handleConfirmPayment = async () => {
     const token = localStorage.getItem('token');
-    const paymentMap = { cod: 'COD', upi: 'UPI', card: 'Card' };
-    const isBuyNow = !!item; // buy-now passes a single item via location.state
+    const isBuyNow = !!item;
 
-    // Build order items — include free combo items as separate line items
+    // Build order items
     const orderItems = [];
     items.forEach(i => {
       orderItems.push({
@@ -84,10 +83,9 @@ function Checkout() {
         subtotal: i.price * (i.quantity || 1),
         isFreeItem: false
       });
-      // If this item has a free combo item, add it as a separate line
       if (i.isCombo && i.freeItem) {
         orderItems.push({
-          productId: i.productId || i.id, // Use same productId but mark as free
+          productId: i.productId || i.id,
           name: i.freeItem.name,
           ageCategory: i.age || '1 year',
           weight: String(i.freeItem.weight) + 'kg',
@@ -99,10 +97,9 @@ function Checkout() {
       }
     });
 
-    const orderPayload = {
+    const orderData = {
       items: orderItems,
       totalAmount: finalPrice,
-      paymentMethod: paymentMap[paymentMethod] || 'COD',
       deliveryAddress: {
         street: deliveryAddress.address,
         city: deliveryAddress.city,
@@ -115,30 +112,135 @@ function Checkout() {
     };
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/orders`, {
+      if (paymentMethod === 'cod') {
+        // Handle COD payment (existing logic)
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            ...orderData,
+            paymentMethod: 'COD'
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Order failed');
+        }
+        
+        const data = await response.json();
+        const orderId = data.order?._id || data.orderId || 'VRM' + Math.floor(10000 + Math.random() * 90000);
+        orderPlacedRef.current = true;
+        if (!isBuyNow && typeof clearCart === 'function') clearCart();
+        navigate('/order-confirmation', { state: { orderId, total: finalPrice.toFixed(2) } });
+      } else {
+        // Handle Razorpay payment (UPI/Card)
+        await handleRazorpayPayment(orderData, token, isBuyNow);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert(`Payment failed: ${error.message}. Please try again.`);
+    }
+  };
+
+  const handleRazorpayPayment = async (orderData, token, isBuyNow) => {
+    try {
+      // Step 1: Create payment order
+      const orderResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/payments/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(orderPayload)
+        body: JSON.stringify({
+          orderId: 'VRM' + Math.floor(10000 + Math.random() * 90000),
+          amount: finalPrice,
+          items: orderData.items
+        })
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Order failed');
+
+      if (!orderResponse.ok) {
+        throw new Error('Failed to create payment order');
       }
-      
-      const data = await response.json();
-      const orderId = data.order?._id || data.orderId || 'VRM' + Math.floor(10000 + Math.random() * 90000);
-      // Set flag before clearing cart so the guard doesn't redirect
-      orderPlacedRef.current = true;
-      // Only clear cart for cart checkout, not buy-now
-      if (!isBuyNow && typeof clearCart === 'function') clearCart();
-      navigate('/order-confirmation', { state: { orderId, total: finalPrice.toFixed(2) } });
+
+      const { razorpayOrderId, amount, currency, key } = await orderResponse.json();
+
+      // Step 2: Open Razorpay payment interface
+      const options = {
+        key: key,
+        amount: amount,
+        currency: currency,
+        name: 'Vetri Rice Shopping',
+        description: 'Premium Quality Rice',
+        order_id: razorpayOrderId,
+        handler: async function (response) {
+          // Step 3: Verify payment
+          await verifyPayment(response, orderData, token, isBuyNow);
+        },
+        prefill: {
+          name: deliveryAddress.fullName,
+          email: user.email,
+          contact: deliveryAddress.phone
+        },
+        notes: {
+          address: deliveryAddress.address
+        },
+        theme: {
+          color: '#8B4513'
+        },
+        modal: {
+          ondismiss: function() {
+            alert('Payment cancelled. You can retry payment anytime.');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (error) {
-      console.error('Order error:', error);
-      alert(`Order failed: ${error.message}. Please try again.`);
+      console.error('Razorpay payment error:', error);
+      throw error;
+    }
+  };
+
+  const verifyPayment = async (paymentResponse, orderData, token, isBuyNow) => {
+    try {
+      const verifyResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/payments/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
+          orderData: orderData
+        })
+      });
+
+      if (!verifyResponse.ok) {
+        throw new Error('Payment verification failed');
+      }
+
+      const data = await verifyResponse.json();
+      const orderId = data.order._id;
+      
+      orderPlacedRef.current = true;
+      if (!isBuyNow && typeof clearCart === 'function') clearCart();
+      navigate('/order-confirmation', { 
+        state: { 
+          orderId, 
+          total: finalPrice.toFixed(2),
+          paymentId: paymentResponse.razorpay_payment_id
+        } 
+      });
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      alert('Payment verification failed. Please contact support with your payment ID.');
     }
   };
 
@@ -328,7 +430,7 @@ function Checkout() {
             <button className="back-btn" onClick={() => setStep(2)}>← Back</button>
             <button className="confirm-btn" onClick={handleConfirmPayment}>
               {paymentMethod === "cod" ? "Confirm Order" : 
-               paymentMethod === "upi" ? "Pay with UPI" : "Pay Now"}
+               paymentMethod === "upi" ? "Pay with UPI (GPay/PhonePe)" : "Pay with Card"}
             </button>
           </div>
         </div>

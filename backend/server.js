@@ -38,6 +38,7 @@ app.use("/api/chat", require("./routes/chatbotRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/returns", require("./routes/returnRoutes"));
+app.use("/api/payments", require("./routes/paymentRoutes"));
 
 // Initialize stocks for all products
 const { initializeAllProductStocks } = require('./services/stockInitService');

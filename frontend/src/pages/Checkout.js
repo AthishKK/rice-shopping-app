@@ -70,11 +70,17 @@ function Checkout() {
     const token = localStorage.getItem('token');
     const isBuyNow = !!item;
 
-    // Build order items - only add free items if they exist, don't duplicate main items
+    // Build order items - ensure no duplicates for single products
     const orderItems = [];
-    items.forEach(i => {
+    console.log('=== CHECKOUT DEBUG ===');
+    console.log('Items to process:', items);
+    console.log('Items count:', items.length);
+    
+    items.forEach((i, index) => {
+      console.log(`Processing item ${index}:`, i);
+      
       // Add main item
-      orderItems.push({
+      const mainItem = {
         productId: i.productId || i.id,
         name: i.name,
         ageCategory: i.age || '1 year',
@@ -83,11 +89,14 @@ function Checkout() {
         price: i.price,
         subtotal: i.price * (i.quantity || 1),
         isFreeItem: false
-      });
+      };
       
-      // Add free combo item ONLY if it exists and is different from main item
-      if (i.isCombo && i.freeItem && i.freeItem.name !== i.name) {
-        orderItems.push({
+      console.log(`Adding main item:`, mainItem);
+      orderItems.push(mainItem);
+      
+      // Only add free combo item if it exists and is actually a combo offer
+      if (i.isCombo && i.freeItem) {
+        const freeItem = {
           productId: i.productId || i.id,
           name: i.freeItem.name,
           ageCategory: i.age || '1 year',
@@ -96,9 +105,15 @@ function Checkout() {
           price: 0,
           subtotal: 0,
           isFreeItem: true
-        });
+        };
+        
+        console.log(`Adding free item:`, freeItem);
+        orderItems.push(freeItem);
       }
     });
+    
+    console.log('Final order items:', orderItems);
+    console.log('Final order items count:', orderItems.length);
 
     const orderData = {
       items: orderItems,

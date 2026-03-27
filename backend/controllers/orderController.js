@@ -9,6 +9,10 @@ exports.createOrder = async (req, res) => {
     const { items, totalAmount, paymentMethod, deliveryAddress, ricePointsUsed = 0, ricePointsDiscount = 0 } = req.body;
     const userId = req.user.userId;
 
+    console.log('=== ORDER CREATION DEBUG ===');
+    console.log('Raw items received:', JSON.stringify(items, null, 2));
+    console.log('Items count:', items.length);
+
     // Resolve productIds — frontend may send static number IDs, look up real DB ObjectId by name
     const resolvedItems = await Promise.all(items.map(async (item) => {
       let dbProductId = item.productId;
@@ -28,6 +32,9 @@ exports.createOrder = async (req, res) => {
       }
       return { ...item, productId: dbProductId };
     }));
+
+    console.log('Resolved items:', JSON.stringify(resolvedItems, null, 2));
+    console.log('Resolved items count:', resolvedItems.length);
 
     // Check stock availability for all items (skip free items)
     for (let item of resolvedItems) {
@@ -59,6 +66,8 @@ exports.createOrder = async (req, res) => {
       ricePointsUsed,
       ricePointsDiscount
     });
+
+    console.log('Order created with items:', JSON.stringify(order.items, null, 2));
 
     // Add rice points to user (for new purchase) and deduct used points
     const ricePointsEarned = calculateRicePoints(totalAmount);

@@ -21,10 +21,6 @@ const productSchema = new mongoose.Schema({
     packed: String,
     grain: String
   },
-  stock: {
-    type: Number,
-    default: 100
-  },
   isTrending: {
     type: Boolean,
     default: false

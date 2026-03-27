@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createPaymentOrder, verifyPayment, handlePaymentFailure } = require('../controllers/paymentController');
-const auth = require('../middleware/auth');
+const auth = require('../middleware/authMiddleware');
 
 // Create payment order (before payment)
 router.post('/create-order', auth, createPaymentOrder);

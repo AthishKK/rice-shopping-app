@@ -50,10 +50,12 @@ exports.getProductStockSummary = async (productId) => {
 // Reduce stock when order is placed
 exports.reduceStock = async (productId, ageCategory, weight, quantity) => {
   try {
+    console.log(`Reducing stock: ${quantity} units for product ${productId}, age: ${ageCategory}, weight: ${weight}`);
+    
     const stock = await Stock.findOne({ productId, ageCategory, weight });
     
     if (!stock) {
-      throw new Error('Stock not found');
+      throw new Error(`Stock not found for product ${productId}, age: ${ageCategory}, weight: ${weight}`);
     }
     
     if (stock.quantity < quantity) {
@@ -63,6 +65,8 @@ exports.reduceStock = async (productId, ageCategory, weight, quantity) => {
     stock.quantity -= quantity;
     stock.lastUpdated = new Date();
     await stock.save();
+    
+    console.log(`Stock reduced successfully. Remaining: ${stock.quantity}`);
     
     return {
       success: true,

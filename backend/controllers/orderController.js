@@ -68,10 +68,17 @@ exports.createOrder = async (req, res) => {
     // Reduce stock (skip free items)
     try {
       for (let item of resolvedItems) {
-        if (item.isFreeItem) continue;
+        if (item.isFreeItem) {
+          console.log(`Skipping stock reduction for free item: ${item.name}`);
+          continue;
+        }
+        
+        console.log(`Processing stock reduction for: ${item.name}, quantity: ${item.quantity}, age: ${item.ageCategory}, weight: ${item.weight}`);
+        
         await reduceStock(item.productId, item.ageCategory, item.weight, item.quantity);
       }
     } catch (stockError) {
+      console.error('Stock reduction failed, deleting order:', stockError);
       await Order.findByIdAndDelete(order._id);
       throw new Error(`Stock reduction failed: ${stockError.message}`);
     }

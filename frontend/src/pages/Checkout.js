@@ -70,9 +70,10 @@ function Checkout() {
     const token = localStorage.getItem('token');
     const isBuyNow = !!item;
 
-    // Build order items
+    // Build order items - only add free items if they exist, don't duplicate main items
     const orderItems = [];
     items.forEach(i => {
+      // Add main item
       orderItems.push({
         productId: i.productId || i.id,
         name: i.name,
@@ -83,7 +84,9 @@ function Checkout() {
         subtotal: i.price * (i.quantity || 1),
         isFreeItem: false
       });
-      if (i.isCombo && i.freeItem) {
+      
+      // Add free combo item ONLY if it exists and is different from main item
+      if (i.isCombo && i.freeItem && i.freeItem.name !== i.name) {
         orderItems.push({
           productId: i.productId || i.id,
           name: i.freeItem.name,

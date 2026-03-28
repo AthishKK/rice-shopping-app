@@ -20,6 +20,7 @@ function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [useRicePoints, setUseRicePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState(0);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState({
     fullName: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
@@ -67,6 +68,14 @@ function Checkout() {
   };
 
   const handleConfirmPayment = async () => {
+    // Prevent double-clicking
+    if (isProcessingPayment) {
+      console.log('Payment already in progress, ignoring click');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    
     const token = localStorage.getItem('token');
     const isBuyNow = !!item;
 
@@ -178,6 +187,7 @@ function Checkout() {
     } catch (error) {
       console.error('Payment error:', error);
       alert(`Payment failed: ${error.message}. Please try again.`);
+      setIsProcessingPayment(false); // Re-enable button on error
     }
   };
 
@@ -228,6 +238,7 @@ function Checkout() {
         },
         modal: {
           ondismiss: function() {
+            setIsProcessingPayment(false); // Re-enable button if payment cancelled
             alert('Payment cancelled. You can retry payment anytime.');
           }
         }
@@ -237,6 +248,7 @@ function Checkout() {
       rzp.open();
     } catch (error) {
       console.error('Razorpay payment error:', error);
+      setIsProcessingPayment(false); // Re-enable button on error
       throw error;
     }
   };
@@ -463,9 +475,23 @@ function Checkout() {
 
           <div className="step-actions">
             <button className="back-btn" onClick={() => setStep(2)}>← Back</button>
-            <button className="confirm-btn" onClick={handleConfirmPayment}>
-              {paymentMethod === "cod" ? "Confirm Order" : 
-               paymentMethod === "upi" ? "Pay with UPI (GPay/PhonePe)" : "Pay with Card"}
+            <button 
+              className="confirm-btn" 
+              onClick={handleConfirmPayment}
+              disabled={isProcessingPayment}
+              style={{
+                opacity: isProcessingPayment ? 0.6 : 1,
+                cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
+                pointerEvents: isProcessingPayment ? 'none' : 'auto'
+              }}
+            >
+              {isProcessingPayment ? (
+                paymentMethod === "cod" ? "Processing Order..." : 
+                paymentMethod === "upi" ? "Opening UPI Payment..." : "Opening Card Payment..."
+              ) : (
+                paymentMethod === "cod" ? "Confirm Order" : 
+                paymentMethod === "upi" ? "Pay with UPI (GPay/PhonePe)" : "Pay with Card"
+              )}
             </button>
           </div>
         </div>

@@ -72,6 +72,8 @@ function Checkout() {
 
     // Build order items - ensure no duplicates for single products
     const orderItems = [];
+    const processedItems = new Set();
+    
     console.log('=== CHECKOUT DEBUG ===');
     console.log('Items to process:', items);
     console.log('Items count:', items.length);
@@ -79,36 +81,51 @@ function Checkout() {
     items.forEach((i, index) => {
       console.log(`Processing item ${index}:`, i);
       
-      // Add main item
-      const mainItem = {
-        productId: i.productId || i.id,
-        name: i.name,
-        ageCategory: i.age || '1 year',
-        weight: String(i.weight) + 'kg',
-        quantity: i.quantity || 1,
-        price: i.price,
-        subtotal: i.price * (i.quantity || 1),
-        isFreeItem: false
-      };
+      // Create unique key to prevent duplicates
+      const itemKey = `${i.productId || i.id}-${i.age || '1 year'}-${i.weight}-${i.name}`;
       
-      console.log(`Adding main item:`, mainItem);
-      orderItems.push(mainItem);
-      
-      // Only add free combo item if it exists and is actually a combo offer
-      if (i.isCombo && i.freeItem) {
-        const freeItem = {
+      if (!processedItems.has(itemKey)) {
+        processedItems.add(itemKey);
+        
+        // Add main item
+        const mainItem = {
           productId: i.productId || i.id,
-          name: i.freeItem.name,
+          name: i.name,
           ageCategory: i.age || '1 year',
-          weight: String(i.freeItem.weight) + 'kg',
-          quantity: 1,
-          price: 0,
-          subtotal: 0,
-          isFreeItem: true
+          weight: String(i.weight) + 'kg',
+          quantity: i.quantity || 1,
+          price: i.price,
+          subtotal: i.price * (i.quantity || 1),
+          isFreeItem: false
         };
         
-        console.log(`Adding free item:`, freeItem);
-        orderItems.push(freeItem);
+        console.log(`Adding main item:`, mainItem);
+        orderItems.push(mainItem);
+        
+        // Only add free combo item if it exists and is actually a combo offer
+        if (i.isCombo && i.freeItem) {
+          const freeItemKey = `${i.productId || i.id}-${i.age || '1 year'}-${i.freeItem.weight}-${i.freeItem.name}-free`;
+          
+          if (!processedItems.has(freeItemKey)) {
+            processedItems.add(freeItemKey);
+            
+            const freeItem = {
+              productId: i.productId || i.id,
+              name: i.freeItem.name,
+              ageCategory: i.age || '1 year',
+              weight: String(i.freeItem.weight) + 'kg',
+              quantity: 1,
+              price: 0,
+              subtotal: 0,
+              isFreeItem: true
+            };
+            
+            console.log(`Adding free item:`, freeItem);
+            orderItems.push(freeItem);
+          }
+        }
+      } else {
+        console.log(`Skipping duplicate item with key: ${itemKey}`);
       }
     });
     

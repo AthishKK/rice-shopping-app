@@ -318,8 +318,32 @@ function MyOrders() {
         <div className="orders-container">
           {orders.map((order) => {
             const step = getStatusStep(order.status);
-            const mainItems = order.items?.filter(i => !i.isFreeItem) || [];
-            const freeItems = order.items?.filter(i => i.isFreeItem) || [];
+            // Remove duplicates by filtering items with same name and specs
+            const uniqueItems = [];
+            const seenItems = new Set();
+            
+            order.items?.forEach(item => {
+              const itemKey = `${item.name}-${item.ageCategory}-${item.weight}-${item.isFreeItem}`;
+              if (!seenItems.has(itemKey)) {
+                seenItems.add(itemKey);
+                uniqueItems.push(item);
+              } else {
+                // If duplicate found, combine quantities
+                const existingItem = uniqueItems.find(ui => 
+                  ui.name === item.name && 
+                  ui.ageCategory === item.ageCategory && 
+                  ui.weight === item.weight && 
+                  ui.isFreeItem === item.isFreeItem
+                );
+                if (existingItem && !item.isFreeItem) {
+                  existingItem.quantity += item.quantity;
+                  existingItem.subtotal += item.subtotal;
+                }
+              }
+            });
+            
+            const mainItems = uniqueItems.filter(i => !i.isFreeItem) || [];
+            const freeItems = uniqueItems.filter(i => i.isFreeItem) || [];
             return (
               <div key={order._id} className="order-card">
                 <div className="order-header">

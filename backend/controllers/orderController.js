@@ -13,8 +13,38 @@ exports.createOrder = async (req, res) => {
     console.log('Raw items received:', JSON.stringify(items, null, 2));
     console.log('Items count:', items.length);
 
+    // Remove duplicates from items array
+    const uniqueItems = [];
+    const seenItems = new Set();
+    
+    items.forEach(item => {
+      const itemKey = `${item.productId}-${item.name}-${item.ageCategory}-${item.weight}-${item.isFreeItem}`;
+      if (!seenItems.has(itemKey)) {
+        seenItems.add(itemKey);
+        uniqueItems.push(item);
+      } else {
+        console.log(`Removing duplicate item: ${item.name}`);
+        // If duplicate found, combine quantities for non-free items
+        const existingItem = uniqueItems.find(ui => 
+          ui.productId === item.productId && 
+          ui.name === item.name && 
+          ui.ageCategory === item.ageCategory && 
+          ui.weight === item.weight && 
+          ui.isFreeItem === item.isFreeItem
+        );
+        if (existingItem && !item.isFreeItem) {
+          existingItem.quantity += item.quantity;
+          existingItem.subtotal += item.subtotal;
+          console.log(`Combined quantities for ${item.name}: ${existingItem.quantity}`);
+        }
+      }
+    });
+    
+    console.log('Unique items after deduplication:', JSON.stringify(uniqueItems, null, 2));
+    console.log('Unique items count:', uniqueItems.length);
+
     // Resolve productIds — frontend may send static number IDs, look up real DB ObjectId by name
-    const resolvedItems = await Promise.all(items.map(async (item) => {
+    const resolvedItems = await Promise.all(uniqueItems.map(async (item) => {
       let dbProductId = item.productId;
       const isValidObjectId = /^[a-f\d]{24}$/i.test(String(item.productId));
       if (!isValidObjectId) {

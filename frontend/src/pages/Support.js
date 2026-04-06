@@ -121,7 +121,7 @@ function Support() {
           <div className="contact-card">
             <div className="card-icon">📞</div>
             <h3>{t('phoneSupport')}</h3>
-            <p className="contact-detail">+91 63740 84487</p>
+            <p className="contact-detail">0123456789</p>
             <p className="timing">{t('available')} 9 AM – 8 PM</p>
           </div>
           <div className="contact-card">

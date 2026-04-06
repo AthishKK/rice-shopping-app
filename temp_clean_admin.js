@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
-import { useLanguage } from "../components/LanguageContext";
-import { useTheme } from "../components/ThemeContext";
 import { backupStocks, restoreStocks, hasStockBackup, generateDefaultStocks } from "../utils/stockBackup";
 import staticProducts from "../data/products";
 
@@ -10,8 +8,6 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function AdminPanel() {
   const { user, isAuthenticated } = useAuth();
-  const { t } = useLanguage();
-  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [tab, setTab] = useState("dashboard");
   const [loading, setLoading] = useState(false);
@@ -39,8 +35,6 @@ function AdminPanel() {
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [reviews, setReviews] = useState([]);
-
-
   const [selectedReview, setSelectedReview] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
@@ -147,40 +141,8 @@ function AdminPanel() {
                 // Backup successful stock data
                 backupStocks(stocksData);
               } else {
-                console.warn('No stocks data received, initializing with default values...');
-                
-                // Load products first
-                const productsForStock = await adminAPI('/products');
-                if (productsForStock.length > 0) {
-                  // Initialize stocks for all products with 50 units
-                  try {
-                    const initResponse = await adminAPI('/stocks/initialize-all', {
-                      method: 'POST'
-                    });
-                    console.log('Stock initialization response:', initResponse);
-                    
-                    // Load stocks again after initialization
-                    const newStocksData = await adminAPI('/stocks');
-                    if (Array.isArray(newStocksData) && newStocksData.length > 0) {
-                      setStocks(newStocksData);
-                      backupStocks(newStocksData);
-                      showMessage(`Initialized and loaded ${newStocksData.length} stock entries`, false);
-                    } else {
-                      // Generate defaults as fallback
-                      const defaultStocks = generateDefaultStocks(productsForStock);
-                      setStocks(defaultStocks);
-                      backupStocks(defaultStocks);
-                      showMessage(`Generated ${defaultStocks.length} default stock entries`, false);
-                    }
-                  } catch (initErr) {
-                    console.error('Stock initialization failed:', initErr);
-                    // Generate defaults as fallback
-                    const defaultStocks = generateDefaultStocks(productsForStock);
-                    setStocks(defaultStocks);
-                    backupStocks(defaultStocks);
-                    showMessage(`Generated ${defaultStocks.length} default stock entries (fallback)`, false);
-                  }
-                }
+                console.warn('No stocks data received');
+                showMessage('No stock data found. Use "Initialize All Stocks" button to create stock entries.', false);
               }
               
               // Load products for stock management
@@ -190,16 +152,16 @@ function AdminPanel() {
               
             } catch (err) {
               console.error('Failed to load stocks:', err);
-              showMessage(`Failed to load stocks: ${err.message}`, true);
+              showMessage(`Failed to load stocks: ${err.message}. Use "Initialize All Stocks" button if needed.`, true);
               
-              // Try backup recovery on API failure
-              if (hasStockBackup()) {
-                const backupStocks = restoreStocks();
-                if (backupStocks.length > 0) {
-                  setStocks(backupStocks);
-                  showMessage(`API failed, restored ${backupStocks.length} stocks from backup`, false);
-                }
-              }
+              // Only try backup recovery if explicitly requested, not automatically
+              // if (hasStockBackup()) {
+              //   const backupStocks = restoreStocks();
+              //   if (backupStocks.length > 0) {
+              //     setStocks(backupStocks);
+              //     showMessage(`API failed, restored ${backupStocks.length} stocks from backup`, false);
+              //   }
+              // }
               
               // Still try to load products
               try {
@@ -498,31 +460,117 @@ function AdminPanel() {
     setShowOrderModal(false);
   };
 
-  // Auto-recover stocks when stocks tab is opened and stocks are empty
-  useEffect(() => {
-    if (tab === 'stocks' && stocks.length === 0 && !loading) {
-      console.log('🔄 Auto-initializing stocks...');
-      // Auto-initialize stocks if empty
-      const autoInitialize = async () => {
+  // Stock recovery function - if stocks are empty, try to reload them
+  const recoverStocks = async () => {
+    if (stocks.length === 0) {
+      try {
+        console.log('🔄 Attempting to recover stocks...');
+        const stocksData = await adminAPI('/stocks');
+        if (Array.isArray(stocksData) && stocksData.length > 0) {
+          setStocks(stocksData);
+          showMessage(`Recovered ${stocksData.length} stock entries!`);
+        } else {
+          showMessage('No stock data found. Please initialize stocks.', true);
+        }
+      } catch (err) {
+        console.error('Stock recovery failed:', err);
+        showMessage(`Stock recovery failed: ${err.message}`, true);
+      }
+    }
+  };
+
+  // Auto-recover stocks when stocks tab is opened and stocks are empty - DISABLED
+  // This was causing auto-refill issues
+  // useEffect(() => {
+  //   if (tab === 'stocks' && stocks.length === 0 && !loading) {
+  //     console.log('🔄 Auto-recovering stocks...');
+  //     recoverStocks();
+  //   }
+  // }, [tab, stocks.length, loading]);
+
+  // Stock initialization function
+  const initializeAllStocks = async () => {
+    try {
+      setLoading(true);
+      showMessage('Initializing stocks for all products...', false);
+      
+      console.log('Calling initialize stocks API...');
+      const response = await adminAPI('/stocks/initialize-all', {
+        method: 'POST'
+      });
+      
+      console.log('Initialize stocks response:', response);
+      showMessage(response.message || 'Stocks initialized successfully!');
+      
+      // Reload stocks data after initialization
+      const stocksData = await adminAPI('/stocks');
+      console.log('Reloaded stocks after initialization:', stocksData.length, 'entries');
+      
+      if (Array.isArray(stocksData) && stocksData.length > 0) {
+        setStocks(stocksData);
+        backupStocks(stocksData);
+      } else {
+        // If API still returns empty, generate defaults and try to save them
+        const productsForStock = await adminAPI('/products');
+        if (productsForStock.length > 0) {
+          const defaultStocks = generateDefaultStocks(productsForStock);
+          
+          // Try to save the generated stocks to backend
+          try {
+            await adminAPI('/stocks/bulk', {
+              method: 'PUT',
+              body: JSON.stringify({ stocks: defaultStocks })
+            });
+            
+            // Reload after saving
+            const savedStocks = await adminAPI('/stocks');
+            if (savedStocks.length > 0) {
+              setStocks(savedStocks);
+              backupStocks(savedStocks);
+              showMessage(`Generated and saved ${savedStocks.length} stock entries!`);
+            } else {
+              setStocks(defaultStocks);
+              backupStocks(defaultStocks);
+              showMessage(`Generated ${defaultStocks.length} default stock entries (local only)`);
+            }
+          } catch (saveErr) {
+            console.error('Failed to save generated stocks:', saveErr);
+            setStocks(defaultStocks);
+            backupStocks(defaultStocks);
+            showMessage(`Generated ${defaultStocks.length} default stock entries (local backup)`);
+          }
+        }
+      }
+      
+    } catch (err) {
+      console.error('Initialize stocks error:', err);
+      showMessage(`Failed to initialize stocks: ${err.message}`, true);
+      
+      // Fallback: try to restore from backup or generate defaults
+      if (hasStockBackup()) {
+        const backupStocks = restoreStocks();
+        if (backupStocks.length > 0) {
+          setStocks(backupStocks);
+          showMessage(`Restored ${backupStocks.length} stocks from backup`, false);
+        }
+      } else {
+        // Generate defaults as last resort
         try {
           const productsForStock = await adminAPI('/products');
           if (productsForStock.length > 0) {
-            const initResponse = await adminAPI('/stocks/initialize-all', {
-              method: 'POST'
-            });
-            const newStocksData = await adminAPI('/stocks');
-            if (Array.isArray(newStocksData) && newStocksData.length > 0) {
-              setStocks(newStocksData);
-              backupStocks(newStocksData);
-            }
+            const defaultStocks = generateDefaultStocks(productsForStock);
+            setStocks(defaultStocks);
+            backupStocks(defaultStocks);
+            showMessage(`Generated ${defaultStocks.length} default stock entries as fallback`, false);
           }
-        } catch (err) {
-          console.error('Auto-initialize failed:', err);
+        } catch (productErr) {
+          console.error('Failed to load products for fallback:', productErr);
         }
-      };
-      autoInitialize();
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [tab, stocks.length, loading]);
+  };
 
   // Filter and search functions
   const filteredOrders = orders.filter(order => {
@@ -544,70 +592,6 @@ function AdminPanel() {
     <>
       <style>
         {`
-          .admin-panel {
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            transition: all 0.3s ease;
-          }
-          
-          .admin-card {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 10px 30px var(--shadow-light);
-            backdrop-filter: blur(15px);
-            transition: all 0.3s ease;
-          }
-          
-          .admin-card:hover {
-            box-shadow: 0 20px 40px var(--shadow-medium);
-          }
-          
-          .admin-text {
-            color: var(--text-primary);
-          }
-          
-          .admin-text-secondary {
-            color: var(--text-secondary);
-          }
-          
-          .admin-input {
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-          }
-          
-          .admin-table {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-          }
-          
-          .admin-table th {
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            border-bottom: 2px solid var(--border-color);
-          }
-          
-          .admin-table td {
-            border-bottom: 1px solid var(--border-color);
-          }
-          
-          .admin-modal {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-          }
-          
-          .hover-lift {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          
-          .hover-lift:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px var(--shadow-medium);
-          }
-          
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -642,18 +626,37 @@ function AdminPanel() {
               transform: translate3d(0, 0, 0);
             }
           }
+          .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+          }
+          .hover-lift {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .hover-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          }
         `}
       </style>
-      <div className="admin-panel" style={{ 
+      <div style={{ 
         padding: '20px', 
         maxWidth: '1200px', 
         margin: '0 auto', 
-        fontFamily: 'Arial, sans-serif'
+        fontFamily: 'Arial, sans-serif',
+        background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 50%, #ff8c42 100%)',
+        minHeight: '100vh'
       }}>
-      <div className="admin-card" style={{ 
+      <div style={{ 
         marginBottom: '30px',
+        background: 'rgba(255, 255, 255, 0.95)',
         padding: '25px',
-        borderRadius: '20px'
+        borderRadius: '20px',
+        boxShadow: '0 10px 30px rgba(255, 107, 53, 0.3)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)'
       }}>
         <h1 style={{ 
           background: 'linear-gradient(45deg, #ff6b35, #f7931e)',
@@ -662,30 +665,8 @@ function AdminPanel() {
           marginBottom: '10px',
           fontSize: '36px',
           fontWeight: 'bold',
-          textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <span>🌾 {t('adminControlCenter')}</span>
-          <button 
-            onClick={toggleTheme}
-            style={{
-              background: isDark ? 'linear-gradient(135deg, #ffd700, #ffed4e)' : 'linear-gradient(135deg, #333, #555)',
-              border: 'none',
-              borderRadius: '25px',
-              padding: '10px 20px',
-              fontSize: '16px',
-              cursor: 'pointer',
-              color: isDark ? '#333' : '#fff',
-              fontWeight: 'bold',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-            }}
-          >
-            {isDark ? `☀️ ${t('lightMode')}` : `🌙 ${t('darkMode')}`}
-          </button>
-        </h1>
+          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
+        }}>🌾 Admin Control Center</h1>
         <p style={{ 
           color: '#666', 
           margin: '0',
@@ -694,7 +675,7 @@ function AdminPanel() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
-          {t('welcomeBack')}, {user?.name} ({user?.email})
+          Welcome back, {user?.name} ({user?.email})
         </p>
       </div>
 
@@ -738,25 +719,28 @@ function AdminPanel() {
       )}
 
       {/* Navigation Tabs */}
-      <div className="admin-card" style={{ 
+      <div style={{ 
         marginBottom: '40px', 
         display: 'flex', 
         gap: '15px', 
         flexWrap: 'wrap',
+        background: 'rgba(255, 255, 255, 0.9)',
         padding: '20px',
-        borderRadius: '20px'
+        borderRadius: '20px',
+        boxShadow: '0 10px 30px rgba(255, 107, 53, 0.2)',
+        backdropFilter: 'blur(15px)'
       }}>
         {[
-          { key: 'dashboard', label: `📊 ${t('dashboard')}`, gradient: 'linear-gradient(135deg, #ff6b35, #f7931e)' },
-          { key: 'products', label: `🌾 ${t('products')}`, gradient: 'linear-gradient(135deg, #4caf50, #66bb6a)' },
-          { key: 'stocks', label: `📦 ${t('stockManagement')}`, gradient: 'linear-gradient(135deg, #673ab7, #9c27b0)' },
-          { key: 'orders', label: `📦 ${t('orders')}`, gradient: 'linear-gradient(135deg, #2196f3, #42a5f5)' },
-          { key: 'users', label: `👥 ${t('users')}`, gradient: 'linear-gradient(135deg, #9c27b0, #ba68c8)' },
-          { key: 'returns', label: `🔄 ${t('returns')}`, gradient: 'linear-gradient(135deg, #e53935, #ef5350)' },
-          { key: 'reviews', label: `⭐ ${t('reviews')}`, gradient: 'linear-gradient(135deg, #ffc107, #ffca28)' },
-          { key: 'flashsale', label: `⚡ ${t('flashSale')}`, gradient: 'linear-gradient(135deg, #ff6b35, #f7931e)' },
-          { key: 'pricing', label: `💰 ${t('pricing')}`, gradient: 'linear-gradient(135deg, #795548, #8d6e63)' },
-          { key: 'analytics', label: `📈 ${t('analytics')}`, gradient: 'linear-gradient(135deg, #607d8b, #78909c)' }
+          { key: 'dashboard', label: '📊 Dashboard', gradient: 'linear-gradient(135deg, #ff6b35, #f7931e)' },
+          { key: 'products', label: '🌾 Products', gradient: 'linear-gradient(135deg, #4caf50, #66bb6a)' },
+          { key: 'stocks', label: '📦 Stock Management', gradient: 'linear-gradient(135deg, #673ab7, #9c27b0)' },
+          { key: 'orders', label: '📦 Orders', gradient: 'linear-gradient(135deg, #2196f3, #42a5f5)' },
+          { key: 'users', label: '👥 Users', gradient: 'linear-gradient(135deg, #9c27b0, #ba68c8)' },
+          { key: 'returns', label: '🔄 Returns', gradient: 'linear-gradient(135deg, #e53935, #ef5350)' },
+          { key: 'reviews', label: '⭐ Reviews', gradient: 'linear-gradient(135deg, #ffc107, #ffca28)' },
+          { key: 'flashsale', label: '⚡ Flash Sale', gradient: 'linear-gradient(135deg, #ff6b35, #f7931e)' },
+          { key: 'pricing', label: '💰 Pricing', gradient: 'linear-gradient(135deg, #795548, #8d6e63)' },
+          { key: 'analytics', label: '📈 Analytics', gradient: 'linear-gradient(135deg, #607d8b, #78909c)' }
         ].map(({ key, label, gradient }) => (
           <button
             key={key}
@@ -785,10 +769,13 @@ function AdminPanel() {
       </div>
 
       {loading && (
-        <div className="admin-card" style={{ 
+        <div style={{ 
           textAlign: 'center', 
           padding: '60px',
-          borderRadius: '20px'
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '20px',
+          boxShadow: '0 10px 30px rgba(255, 107, 53, 0.2)',
+          backdropFilter: 'blur(15px)'
         }}>
           <div style={{
             width: '60px',
@@ -805,7 +792,7 @@ function AdminPanel() {
             WebkitTextFillColor: 'transparent',
             fontSize: '18px',
             fontWeight: 'bold'
-          }}>{t('loadingAmazingData')}</div>
+          }}>Loading amazing data...</div>
         </div>
       )}
 
@@ -839,11 +826,11 @@ function AdminPanel() {
                 borderRadius: '50%'
               }}></div>
               <div style={{ zIndex: 2 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold' }}>📊 {t('liveMarketPrice')}: ₹{stats.marketPrice.pricePerKg}/kg</h4>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold' }}>📊 Live Market Price: ₹{stats.marketPrice.pricePerKg}/kg</h4>
                 <p style={{ margin: '0', fontSize: '14px', opacity: 0.9 }}>
-                  {t('trend')}: {stats.marketPrice.trend === 'up' ? `⬆️ ${t('up')}` : stats.marketPrice.trend === 'down' ? `⬇️ ${t('down')}` : `➡️ ${t('stable')}`} • 
-                  {t('source')}: {stats.marketPrice.source} • 
-                  {t('updated')}: {new Date(stats.marketPrice.lastUpdated).toLocaleString('en-IN')}
+                  Trend: {stats.marketPrice.trend === 'up' ? '⬆️ Up' : stats.marketPrice.trend === 'down' ? '⬇️ Down' : '➡️ Stable'} • 
+                  Source: {stats.marketPrice.source} • 
+                  Updated: {new Date(stats.marketPrice.lastUpdated).toLocaleString('en-IN')}
                 </p>
               </div>
               <div style={{ 
@@ -883,9 +870,9 @@ function AdminPanel() {
                 borderRadius: '50%'
               }}></div>
               <div style={{ zIndex: 2 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold' }}>🎉 {t('activeFestival')}: {stats.activeFestival.name}</h4>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold' }}>🎉 Active Festival: {stats.activeFestival.name}</h4>
                 <p style={{ margin: '0', fontSize: '14px', opacity: 0.9 }}>
-                  {stats.activeFestival.discount}% {t('discount')} • {stats.activeFestival.bannerText}
+                  {stats.activeFestival.discount}% discount • {stats.activeFestival.bannerText}
                 </p>
               </div>
               <div style={{ 
@@ -903,10 +890,10 @@ function AdminPanel() {
             marginBottom: '35px'
           }}>
             {[
-              { label: t('totalUsers'), value: stats.stats?.totalUsers || 0, icon: '👥', gradient: 'linear-gradient(135deg, #1976d2, #42a5f5)' },
-              { label: t('totalOrders'), value: stats.stats?.totalOrders || 0, icon: '📦', gradient: 'linear-gradient(135deg, #388e3c, #66bb6a)' },
-              { label: t('totalProducts'), value: stats.stats?.totalProducts || 0, icon: '🌾', gradient: 'linear-gradient(135deg, #f57c00, #ffb74d)' },
-              { label: t('totalRevenue'), value: `₹${stats.stats?.totalRevenue || 0}`, icon: '💰', gradient: 'linear-gradient(135deg, #7b1fa2, #ba68c8)' }
+              { label: 'Total Users', value: stats.stats?.totalUsers || 0, icon: '👥', gradient: 'linear-gradient(135deg, #1976d2, #42a5f5)' },
+              { label: 'Total Orders', value: stats.stats?.totalOrders || 0, icon: '📦', gradient: 'linear-gradient(135deg, #388e3c, #66bb6a)' },
+              { label: 'Total Products', value: stats.stats?.totalProducts || 0, icon: '🌾', gradient: 'linear-gradient(135deg, #f57c00, #ffb74d)' },
+              { label: 'Total Revenue', value: `₹${stats.stats?.totalRevenue || 0}`, icon: '💰', gradient: 'linear-gradient(135deg, #7b1fa2, #ba68c8)' }
             ].map((stat, index) => (
               <div key={index} style={{
                 background: 'rgba(255, 255, 255, 0.95)',
@@ -979,7 +966,7 @@ function AdminPanel() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
               marginBottom: '20px'
             }}>
-              <h3 style={{ marginTop: '0', color: '#333' }}>{t('orderStatusBreakdown')}</h3>
+              <h3 style={{ marginTop: '0', color: '#333' }}>Order Status Breakdown</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
                 {stats.orderStats.map((status, index) => {
                   const colors = {
@@ -1042,7 +1029,7 @@ function AdminPanel() {
                 position: 'relative'
               }}>
                 <span style={{ fontSize: '28px' }}>⚠️</span>
-                {t('criticalStockAlert')} ({stats.lowStockProducts.length} {t('products')})
+                Critical Stock Alert ({stats.lowStockProducts.length} products)
               </h3>
               <div style={{ 
                 display: 'grid', 
@@ -1072,14 +1059,14 @@ function AdminPanel() {
                   zIndex: 2,
                   position: 'relative'
                 }}>
-                  +{stats.lowStockProducts.length - 6} {t('moreProducts')}
+                  +{stats.lowStockProducts.length - 6} more products need immediate attention
                 </div>
               )}
             </div>
           )}
 
           {/* Recent Orders */}
-          <div className="admin-card hover-lift" style={{
+          <div className="glass-card hover-lift" style={{
             padding: '30px',
             borderRadius: '20px',
             animation: 'fadeInUp 0.6s ease-out'
@@ -1092,7 +1079,7 @@ function AdminPanel() {
               fontSize: '24px',
               fontWeight: 'bold',
               marginBottom: '25px'
-            }}>{t('recentOrders')}</h3>
+            }}>Recent Orders</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -1100,11 +1087,11 @@ function AdminPanel() {
                     background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
                     color: 'white'
                   }}>
-                    <th style={{ padding: '15px', textAlign: 'left', borderRadius: '10px 0 0 0', fontWeight: 'bold' }}>{t('orderId')}</th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>{t('customer')}</th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>{t('status')}</th>
-                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>{t('amount')}</th>
-                    <th style={{ padding: '15px', textAlign: 'left', borderRadius: '0 10px 0 0', fontWeight: 'bold' }}>{t('date')}</th>
+                    <th style={{ padding: '15px', textAlign: 'left', borderRadius: '10px 0 0 0', fontWeight: 'bold' }}>Order ID</th>
+                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Customer</th>
+                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Status</th>
+                    <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Amount</th>
+                    <th style={{ padding: '15px', textAlign: 'left', borderRadius: '0 10px 0 0', fontWeight: 'bold' }}>Date</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1177,13 +1164,15 @@ function AdminPanel() {
 
       {/* Products Tab */}
       {tab === 'products' && (
-        <div className="admin-card" style={{
+        <div style={{
+          backgroundColor: 'white',
           padding: '20px',
-          borderRadius: '10px'
+          borderRadius: '10px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          <h3 className="admin-text" style={{ marginTop: '0' }}>{t('products')} ({products.length})</h3>
+          <h3 style={{ marginTop: '0', color: '#333' }}>Products ({products.length})</h3>
           <div style={{ overflowX: 'auto' }}>
-            <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f5f5f5' }}>
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Name</th>
@@ -1213,21 +1202,22 @@ function AdminPanel() {
 
       {/* Orders Tab */}
       {tab === 'orders' && (
-        <div className="admin-card" style={{
+        <div style={{
+          backgroundColor: 'white',
           padding: '20px',
-          borderRadius: '10px'
+          borderRadius: '10px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 className="admin-text" style={{ margin: '0' }}>{t('orders')} ({filteredOrders.length})</h3>
+            <h3 style={{ margin: '0', color: '#333' }}>Orders ({filteredOrders.length})</h3>
             
             {/* Search and Filter Controls */}
             <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
               <input
                 type="text"
-                placeholder={`🔍 ${t('searchOrdersCustomers')}`}
+                placeholder="🔍 Search orders, customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="admin-input"
                 style={{
                   padding: '8px 12px',
                   border: '1px solid #ddd',
@@ -1239,7 +1229,6 @@ function AdminPanel() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="admin-input"
                 style={{
                   padding: '8px 12px',
                   border: '1px solid #ddd',
@@ -1247,12 +1236,12 @@ function AdminPanel() {
                   fontSize: '14px'
                 }}
               >
-                <option value="All">{t('allStatus')}</option>
-                <option value="Placed">{t('placed')}</option>
-                <option value="Processing">{t('processing')}</option>
-                <option value="Shipped">{t('shipped')}</option>
-                <option value="Delivered">{t('delivered')}</option>
-                <option value="Cancelled">{t('cancelled')}</option>
+                <option value="All">All Status</option>
+                <option value="Placed">Placed</option>
+                <option value="Processing">Processing</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -1775,6 +1764,7 @@ function AdminPanel() {
                     <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Select</th>
                     <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Product Name</th>
                     <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Category</th>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Stock</th>
                     <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Current Status</th>
                   </tr>
                 </thead>
@@ -1793,6 +1783,14 @@ function AdminPanel() {
                         {product.name}
                       </td>
                       <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>{product.category}</td>
+                      <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
+                        <span style={{
+                          color: product.stock < 10 ? '#c62828' : '#2e7d32',
+                          fontWeight: product.stock < 10 ? 'bold' : 'normal'
+                        }}>
+                          {product.stock} {product.stock < 10 && '⚠️'}
+                        </span>
+                      </td>
                       <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
                         {product.isFlashSale ? (
                           <span style={{ color: '#ff6b35', fontWeight: 'bold' }}>🔥 Flash Sale ({product.flashSaleDiscount}%)</span>
@@ -1923,7 +1921,17 @@ function AdminPanel() {
                 </div>
               </div>
               
-
+              <div style={{ padding: '20px', backgroundColor: '#f3e5f5', borderRadius: '10px', border: '2px solid #9c27b0' }}>
+                <h4 style={{ margin: '0 0 15px 0', color: '#7b1fa2' }}>🎉 Festival System</h4>
+                <div style={{ fontSize: '14px', color: '#333', lineHeight: '1.6' }}>
+                  <strong>Date-based:</strong> Auto-activates during festival periods<br/>
+                  <strong>Manual Control:</strong> Admin can toggle anytime<br/>
+                  <strong>Discount Range:</strong> 5-30%<br/>
+                  <strong>Apply to:</strong> All products<br/>
+                  <br/>
+                  <strong>Examples:</strong> Diwali, Pongal, Onam
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1943,7 +1951,8 @@ function AdminPanel() {
           alignItems: 'center',
           zIndex: 1000
         }}>
-          <div className="admin-modal" style={{
+          <div style={{
+            backgroundColor: 'white',
             borderRadius: '10px',
             padding: '30px',
             maxWidth: '600px',
@@ -1953,7 +1962,7 @@ function AdminPanel() {
             boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 className="admin-text" style={{ margin: 0 }}>📦 {t('orderDetails')}</h2>
+              <h2 style={{ margin: 0, color: '#333' }}>📦 Order Details</h2>
               <button
                 onClick={closeOrderModal}
                 style={{
@@ -2146,6 +2155,15 @@ function AdminPanel() {
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>Active Sales: {stats.activeFlashSales || 0}</div>
                 <div style={{ fontSize: '12px', color: '#666' }}>Products on Sale: {stats.flashSaleProducts || 0}</div>
+              </div>
+              
+              <div style={{ padding: '15px', backgroundColor: '#f3e5f5', borderRadius: '8px', border: '1px solid #9c27b0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>🎉</span>
+                  <div style={{ fontWeight: 'bold', color: '#7b1fa2' }}>Festivals</div>
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>Active Festival: {stats.activeFestival ? stats.activeFestival.name : 'None'}</div>
+                <div style={{ fontSize: '12px', color: '#666' }}>Discount: {stats.activeFestival ? `${stats.activeFestival.discount}%` : '0%'}</div>
               </div>
             </div>
           </div>
@@ -2429,6 +2447,62 @@ function AdminPanel() {
                   <option value="low">Low Stock (≤8)</option>
                   <option value="out">Out of Stock</option>
                 </select>
+                <button
+                  onClick={recoverStocks}
+                  style={{
+                    padding: '10px 15px',
+                    background: 'linear-gradient(135deg, #2196f3, #42a5f5)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)'
+                  }}
+                >
+                  🔄 Recover Stocks
+                </button>
+                <button
+                  onClick={initializeAllStocks}
+                  style={{
+                    padding: '10px 15px',
+                    background: 'linear-gradient(135deg, #4caf50, #66bb6a)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)'
+                  }}
+                >
+                  🔄 Initialize All Stocks
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const debug = await adminAPI('/stocks/debug');
+                      console.log('Stock debug info:', debug);
+                      showMessage(`Debug: ${debug.totalProducts} products, ${debug.totalStocks} stocks. Check console for details.`);
+                    } catch (err) {
+                      showMessage(`Debug failed: ${err.message}`, true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 15px',
+                    background: 'linear-gradient(135deg, #9c27b0, #ba68c8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(156, 39, 176, 0.3)'
+                  }}
+                >
+                  🔍 Debug Stocks
+                </button>
               </div>
             </div>
           </div>

@@ -45,6 +45,16 @@ exports.getAllProducts = async (req, res) => {
 
     const products = await Product.find(filter);
     
+    // Get current flash sale info if filtering for flash sale products
+    let flashSaleEndTime = null;
+    if (flashSale === 'true') {
+      const { getCurrentFlashSale } = require('../services/flashSaleService');
+      const currentFlashSale = await getCurrentFlashSale();
+      if (currentFlashSale) {
+        flashSaleEndTime = currentFlashSale.endTime;
+      }
+    }
+    
     // Add pricing and stock for each product (default 6 months, 1kg)
     const productsWithPricing = await Promise.all(
       products.map(async (product) => {
@@ -56,13 +66,15 @@ exports.getAllProducts = async (req, res) => {
           return {
             ...product.toObject(),
             pricing: priceData,
-            stock: stockStatus
+            stock: stockStatus,
+            flashSaleEndTime: flashSaleEndTime // Include flash sale end time
           };
         } catch (error) {
           return {
             ...product.toObject(),
             pricing: { finalPrice: 0, error: "Price unavailable" },
-            stock: { status: 'unknown', quantity: 0, message: 'Stock unavailable' }
+            stock: { status: 'unknown', quantity: 0, message: 'Stock unavailable' },
+            flashSaleEndTime: flashSaleEndTime
           };
         }
       })

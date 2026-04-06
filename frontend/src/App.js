@@ -17,6 +17,7 @@ import TrackOrder from "./pages/TrackOrder";
 import MyOrders from "./pages/MyOrders";
 import Support from "./pages/Support";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import LimitedOffers from "./pages/LimitedOffers";
 import Signup from "./pages/Signup";
 import FlashSale from "./pages/FlashSale";
@@ -43,6 +44,7 @@ function App() {
                 <Route path="/trending-products" element={<TrendingProducts />} />
                 <Route path="/all-products" element={<AllProducts />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
                 <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />

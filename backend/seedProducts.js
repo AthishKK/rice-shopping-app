@@ -26,28 +26,30 @@ const seedProducts = async () => {
 
     // Only seed products if none exist
     const existingCount = await Product.countDocuments();
-    if (existingCount > 0) {
-      console.log(`⚠️  ${existingCount} products already exist. Deleting and re-seeding...`);
-      await Product.deleteMany({});
-      await Stock.deleteMany({});
-    }
+    if (existingCount === 0) {
+      console.log("📦 No products found. Seeding initial products...");
+      
+      const products = await Product.insertMany(sampleProducts);
+      console.log(`✅ Seeded ${products.length} products`);
 
-    const products = await Product.insertMany(sampleProducts);
-    console.log(`✅ Seeded ${products.length} products`);
-
-    // Seed stock for each product
-    const ageCategories = ['6 months', '1 year', '2 years'];
-    const weights = ['1kg', '2kg', '3kg', '4kg', '5kg', '10kg', '25kg', '26kg', '50kg'];
-    const stockEntries = [];
-    for (const product of products) {
-      for (const age of ageCategories) {
-        for (const weight of weights) {
-          stockEntries.push({ productId: product._id, ageCategory: age, weight, quantity: 50 });
+      // Seed stock for each product
+      const ageCategories = ['6 months', '1 year', '2 years'];
+      const weights = ['1kg', '2kg', '3kg', '4kg', '5kg', '10kg', '25kg', '26kg', '50kg'];
+      const stockEntries = [];
+      for (const product of products) {
+        for (const age of ageCategories) {
+          for (const weight of weights) {
+            stockEntries.push({ productId: product._id, ageCategory: age, weight, quantity: 50 });
+          }
         }
       }
+      await Stock.insertMany(stockEntries);
+      console.log(`✅ Seeded ${stockEntries.length} stock entries`);
+      
+      console.log("Products:", products.map(p => p.name).join(", "));
+    } else {
+      console.log(`✅ ${existingCount} products already exist. Skipping product seeding.`);
     }
-    await Stock.insertMany(stockEntries);
-    console.log(`✅ Seeded ${stockEntries.length} stock entries`);
 
     // Seed market price if not exists
     const mp = await MarketPrice.findOne({ commodity: "Rice" });
@@ -56,8 +58,7 @@ const seedProducts = async () => {
       console.log("✅ Seeded market price");
     }
 
-    console.log("\n🎉 Done! Products and stocks seeded successfully.");
-    console.log("Products:", products.map(p => p.name).join(", "));
+    console.log("\n🎉 Database seeding completed successfully.");
   } catch (error) {
     console.error("❌ Seed error:", error.message);
   } finally {

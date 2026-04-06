@@ -202,7 +202,7 @@ function ProductPage() {
               </div>
               <div className="section-content">
                 <ul className="health-benefits-list">
-                  {product.healthBenefits.map((benefit, idx) => <li key={idx}>✓ {benefit}</li>)}
+                  {product.healthBenefits.map((benefit, idx) => <li key={idx}>✓ {t(benefit)}</li>)}
                 </ul>
               </div>
             </div>

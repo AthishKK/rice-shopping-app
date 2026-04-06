@@ -435,6 +435,163 @@
   box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
 }
 
+/* Rice Points Section */
+.rice-points-section {
+  background: linear-gradient(135deg, #fff8e1, #ffecb3);
+  border: 2px solid #ffc107;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 16px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.rice-points-section::before {
+  content: "🌾";
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 60px;
+  opacity: 0.1;
+  transform: rotate(15deg);
+}
+
+.rice-points-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.rice-points-header span {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e65100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.use-points-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f57c00;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid #ffc107;
+  transition: all 0.3s;
+}
+
+.use-points-toggle:hover {
+  background: #ffc107;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.use-points-toggle input[type="checkbox"] {
+  accent-color: #ff9800;
+  width: 18px;
+  height: 18px;
+}
+
+.points-slider {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #ffcc02;
+}
+
+.points-slider input[type="range"] {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #ffecb3;
+  outline: none;
+  margin-bottom: 12px;
+  -webkit-appearance: none;
+}
+
+.points-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+  transition: all 0.2s;
+}
+
+.points-slider input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.6);
+}
+
+.points-slider input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+}
+
+.points-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.points-info span:first-child {
+  color: #e65100;
+  background: #fff3e0;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #ffcc02;
+}
+
+.points-info span:last-child {
+  color: #bf360c;
+  font-size: 13px;
+}
+
+.rice-points-section .summary-row.discount {
+  background: white;
+  margin: 12px -4px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #4caf50;
+  font-size: 16px;
+}
+
+.rice-points-section .summary-row.discount span:first-child::before {
+  content: "🎉 ";
+}
+
+@media (max-width: 600px) {
+  .rice-points-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .points-info {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 600px) {
   .form-row {
     grid-template-columns: 1fr;

@@ -13,13 +13,18 @@ function TodaysDeals() {
   const { user } = useAuth();
   const { getPrices } = useLivePrice();
   const [productStocks, setProductStocks] = useState({});
+  const [todaysDeals, setTodaysDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     // Load stock information
-    const loadProductStocks = async () => {
+    const loadData = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/products`);
-        const products = await response.json();
+        setLoading(true);
+        
+        // Load stock information
+        const stockResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/products`);
+        const products = await stockResponse.json();
         const stockData = {};
         
         products.forEach(product => {
@@ -29,17 +34,29 @@ function TodaysDeals() {
         });
         
         setProductStocks(stockData);
+        
+        // Use the same logic as Home page for consistency
+        setTodaysDeals(getTodaysDealsLegacy(stockData));
+        
       } catch (error) {
-        console.error('Failed to load product stocks:', error);
+        console.error('Failed to load today\'s deals:', error);
+        // Use legacy method with empty stock data
+        setTodaysDeals(getTodaysDealsLegacy({}));
+      } finally {
+        setLoading(false);
       }
     };
     
-    loadProductStocks();
-  }, []);
+    loadData();
+  }, [user?.isPremium]);
 
-  const getTodaysDeals = () => {
+  // Get today's deals - same for all users, changes only at midnight
+  const getTodaysDealsLegacy = (stockData = {}) => {
     const today = new Date();
+    // Use today's date as seed to ensure same deals for all users throughout the day
+    const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
     const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+    
     const dealConfigs = [
       { productId: 1, weight: 5, age: "1 year" },
       { productId: 3, weight: 3, age: "2 years" },
@@ -47,18 +64,25 @@ function TodaysDeals() {
       { productId: 7, weight: 4, age: "6 months" },
       { productId: 2, weight: 3, age: "1 year" },
       { productId: 8, weight: 2, age: "2 years" },
-      { productId: 4, weight: 5, age: "1 year" }
+      { productId: 4, weight: 5, age: "1 year" },
+      { productId: 6, weight: 3, age: "1 year" },
+      { productId: 9, weight: 4, age: "2 years" },
+      { productId: 10, weight: 2, age: "6 months" }
     ];
+    
     const deals = [];
-    for (let i = 0; i < 6; i++) {
+    // Use dayOfYear to select consistent deals for the entire day
+    for (let i = 0; i < 4; i++) {
       const cfg = dealConfigs[(dayOfYear + i) % dealConfigs.length];
       const product = staticProducts.find(p => p.id === cfg.productId);
       if (!product) continue;
+      
       const normalLp = getPrices(cfg.productId, user?.isPremium, false);
-      const dealLp   = getPrices(cfg.productId, user?.isPremium, true);
+      const dealLp = getPrices(cfg.productId, user?.isPremium, true);
       const normalPrice = normalLp.prices[cfg.age];
-      const dealPrice   = dealLp.prices[cfg.age];
-      const stockInfo = productStocks[product.id] || { status: 'in-stock', quantity: 50 };
+      const dealPrice = dealLp.prices[cfg.age];
+      const stockInfo = stockData[product.id] || { status: 'in-stock', quantity: 50 };
+      
       deals.push({
         ...product,
         prices: dealLp.prices,
@@ -72,13 +96,35 @@ function TodaysDeals() {
         totalDiscount: dealLp.discount + 5,
         extraDiscount: 5,
         savings: (normalPrice - dealPrice) * cfg.weight,
-        stockInfo
+        stockInfo,
+        dealDate: dateString // Add date for debugging
       });
     }
     return deals;
   };
 
-  const todaysDeals = getTodaysDeals();
+  if (loading) {
+    return (
+      <div className="section-page">
+        <div className="section-header">
+          <h1>🛍️ {t('todaysDeals')}</h1>
+          <p className="section-subtitle">{t('limitedOffersExtraDiscounts')}</p>
+        </div>
+        <div className="loading-container" style={{ textAlign: 'center', padding: '60px' }}>
+          <div className="loading-spinner" style={{
+            width: '50px',
+            height: '50px',
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #ff6b35',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }}></div>
+          <p>Loading today's deals...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="section-page">

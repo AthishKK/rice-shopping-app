@@ -3,11 +3,22 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const { calculateDeliveryDate, generateOrderId, calculateRicePoints } = require("../utils/helpers");
 const { reduceStock, restoreStock, checkStockAvailability } = require("../services/stockService");
+const { sendOrderConfirmationEmail, sendOrderConfirmationSMS, sendOrderStatusUpdateEmail } = require("../services/notificationService");
 
 exports.createOrder = async (req, res) => {
   try {
-    const { items, totalAmount, paymentMethod, deliveryAddress } = req.body;
+    const { items, totalAmount, paymentMethod, deliveryAddress, ricePointsUsed, ricePointsDiscount } = req.body;
     const userId = req.user.userId;
+
+    // Validate rice points usage
+    if (ricePointsUsed > 0) {
+      const user = await User.findById(userId);
+      if (!user || user.ricePoints < ricePointsUsed) {
+        return res.status(400).json({
+          message: `Insufficient rice points. You have ${user?.ricePoints || 0} points but tried to use ${ricePointsUsed}.`
+        });
+      }
+    }
 
     // Resolve productIds — frontend may send static number IDs, look up real DB ObjectId by name
     const resolvedItems = await Promise.all(items.map(async (item) => {
@@ -29,9 +40,9 @@ exports.createOrder = async (req, res) => {
       return { ...item, productId: dbProductId };
     }));
 
-    // Check stock availability for all items (skip free items)
+    // Check stock availability for all items (including free items)
     for (let item of resolvedItems) {
-      if (item.isFreeItem) continue;
+      // Check stock for all items, including free items from limited offers
       const stockCheck = await checkStockAvailability(
         item.productId,
         item.ageCategory,
@@ -53,19 +64,25 @@ exports.createOrder = async (req, res) => {
       userId,
       items: resolvedItems,
       totalAmount,
+      ricePointsUsed: ricePointsUsed || 0,
+      ricePointsDiscount: ricePointsDiscount || 0,
       paymentMethod,
       deliveryAddress,
       estimatedDelivery
     });
 
-    // Add rice points to user
-    const ricePoints = calculateRicePoints(totalAmount);
-    await User.findByIdAndUpdate(userId, { $inc: { ricePoints } });
+    // Calculate rice points to add (from purchase) and subtract (from usage)
+    const ricePointsEarned = calculateRicePoints(totalAmount);
+    const netRicePointsChange = ricePointsEarned - (ricePointsUsed || 0);
+    
+    // Update user rice points
+    await User.findByIdAndUpdate(userId, { $inc: { ricePoints: netRicePointsChange } });
 
-    // Reduce stock (skip free items)
+    // Reduce stock (including free items from limited offers)
     try {
       for (let item of resolvedItems) {
-        if (item.isFreeItem) continue;
+        // Reduce stock for all items, including free items from limited offers
+        // Free items still consume stock inventory
         await reduceStock(item.productId, item.ageCategory, item.weight, item.quantity);
       }
     } catch (stockError) {
@@ -73,10 +90,47 @@ exports.createOrder = async (req, res) => {
       throw new Error(`Stock reduction failed: ${stockError.message}`);
     }
 
+    // Send order confirmation notifications
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        const orderDetails = {
+          orderId: order._id.toString().slice(-8).toUpperCase(),
+          orderDate: order.createdAt,
+          totalAmount: order.totalAmount,
+          paymentMethod: order.paymentMethod,
+          estimatedDelivery: order.estimatedDelivery,
+          items: resolvedItems.map(item => ({
+            name: item.name,
+            ageCategory: item.ageCategory,
+            weight: item.weight,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          deliveryAddress: order.deliveryAddress
+        };
+
+        // Send email notification
+        if (user.email) {
+          await sendOrderConfirmationEmail(user.email, user.name, orderDetails);
+        }
+
+        // Send SMS notification
+        if (deliveryAddress.phone) {
+          await sendOrderConfirmationSMS(deliveryAddress.phone, user.name, orderDetails);
+        }
+      }
+    } catch (notificationError) {
+      console.error('Failed to send order confirmation notifications:', notificationError);
+      // Don't fail the order creation if notifications fail
+    }
+
     res.status(201).json({
       message: "Order created successfully",
       order,
-      ricePointsEarned: ricePoints,
+      ricePointsEarned,
+      ricePointsUsed: ricePointsUsed || 0,
+      netRicePointsChange,
       orderId: generateOrderId()
     });
   } catch (error) {
@@ -133,10 +187,31 @@ exports.updateOrderStatus = async (req, res) => {
       orderId,
       { status },
       { new: true }
-    );
+    ).populate('userId', 'name email');
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Send status update notification
+    try {
+      if (order.userId && order.userId.email) {
+        const orderDetails = {
+          orderId: order._id.toString().slice(-8).toUpperCase(),
+          totalAmount: order.totalAmount,
+          paymentMethod: order.paymentMethod
+        };
+        
+        await sendOrderStatusUpdateEmail(
+          order.userId.email, 
+          order.userId.name, 
+          orderDetails, 
+          status
+        );
+      }
+    } catch (notificationError) {
+      console.error('Failed to send order status update notification:', notificationError);
+      // Don't fail the status update if notification fails
     }
 
     res.json({

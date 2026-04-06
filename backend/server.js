@@ -34,13 +34,19 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/offers", require("./routes/offerRoutes"));
+app.use("/api/combo-offers", require("./routes/comboOfferRoutes"));
+app.use("/api/todays-deals", require("./routes/todaysDealsRoutes"));
+app.use("/api/flash-sale", require("./routes/flashSaleRoutes"));
 app.use("/api/chat", require("./routes/chatbotRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/returns", require("./routes/returnRoutes"));
+app.use("/api/payment", require("./routes/paymentRoutes"));
 
 // Initialize stocks for all products
 const { initializeAllProductStocks } = require('./services/stockInitService');
+const { initializeTodaysDeals } = require('./services/todaysDealsService');
+const flashSaleScheduler = require('./services/flashSaleScheduler');
 
 // Start cron jobs
 require("./utils/cronJobs")();
@@ -56,5 +62,20 @@ app.listen(PORT, async () => {
     await initializeAllProductStocks();
   } catch (error) {
     console.error('Failed to initialize stocks:', error);
+  }
+  
+  // Initialize today's deals
+  try {
+    await initializeTodaysDeals();
+  } catch (error) {
+    console.error('Failed to initialize today\'s deals:', error);
+  }
+  
+  // Start flash sale scheduler
+  try {
+    flashSaleScheduler.start();
+    console.log('🔥 Flash sale scheduler started');
+  } catch (error) {
+    console.error('Failed to start flash sale scheduler:', error);
   }
 });

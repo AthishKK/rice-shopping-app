@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  premiumStartDate: {
+    type: Date
+  },
+  premiumExpiryDate: {
+    type: Date
+  },
   isAdmin: {
     type: Boolean,
     default: false
@@ -31,6 +37,12 @@ const userSchema = new mongoose.Schema({
     city: String,
     state: String,
     pincode: String
+  },
+  resetPasswordOTP: {
+    type: String
+  },
+  resetPasswordExpiry: {
+    type: Date
   },
   createdAt: {
     type: Date,

@@ -1,6 +1,7 @@
 const Offer = require("../models/Offer");
 const Product = require("../models/Product");
 const Festival = require("../models/Festival");
+const FlashSale = require("../models/FlashSale");
 
 // Default Indian festivals — seeded into DB on first run
 const DEFAULT_FESTIVALS = [

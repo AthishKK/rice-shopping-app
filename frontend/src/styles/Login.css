@@ -230,6 +230,33 @@
   opacity: 0.5;
 }
 
+.resend-otp {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #ff6b35;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.link-button:hover:not(:disabled) {
+  background-color: #fff5f2;
+}
+
+.link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 @media (max-width: 480px) {
   .login-container {
     padding: 30px 20px;

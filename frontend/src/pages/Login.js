@@ -19,11 +19,39 @@ function Login() {
     if (location.state?.message) {
       setMessage(location.state.message);
     }
+    // Clear form data when component mounts and force clear any autofilled values
+    setFormData({ email: "", password: "" });
+    
+    // Additional cleanup to prevent autofill
+    const timer = setTimeout(() => {
+      const emailInput = document.querySelector('input[name="email"]');
+      const passwordInput = document.querySelector('input[name="password"]');
+      if (emailInput) emailInput.value = '';
+      if (passwordInput) passwordInput.value = '';
+      setFormData({ email: "", password: "" });
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [location]);
+
+  // Clear form data when component unmounts
+  useEffect(() => {
+    return () => {
+      setFormData({ email: "", password: "" });
+    };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
+  };
+
+  const handleFocus = (e) => {
+    // Clear any autofilled values when user focuses on input
+    if (e.target.value && !formData[e.target.name]) {
+      e.target.value = '';
+      setFormData({ ...formData, [e.target.name]: '' });
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -63,7 +91,7 @@ function Login() {
         {message && <div className="success-message">{message}</div>}
         {error && <div className="error-message">{error}</div>}
         
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form" autoComplete="new-password">
           <div className="form-group">
             <label>{t('email')}</label>
             <input
@@ -71,8 +99,13 @@ function Login() {
               name="email"
               value={formData.email}
               onChange={handleChange}
+              onFocus={handleFocus}
               placeholder={`Enter your ${t('email').toLowerCase()}`}
               disabled={loading}
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
             />
           </div>
           
@@ -84,8 +117,13 @@ function Login() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                onFocus={handleFocus}
                 placeholder={`Enter your ${t('password').toLowerCase()}`}
                 disabled={loading}
+                autoComplete="new-password"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
               />
               <button
                 type="button"

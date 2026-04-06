@@ -1,14 +1,18 @@
 const cron = require("node-cron");
 const { updateMarketPrice, initializeMarketPrice } = require("../services/marketService");
-const { createFlashSale, getCurrentFestival, applyFestivalDiscount, seedFestivals } = require("../services/festivalService");
+const { createFlashSale, expireOldFlashSales } = require("../services/flashSaleService");
+const { createComboOffers, expireOldComboOffers } = require("../services/comboOfferService");
 
 const startCronJobs = () => {
-  // Seed festivals and initialize market price on startup
-  seedFestivals();
+  // Initialize market price on startup
   initializeMarketPrice();
 
-  // Apply current festival discount on startup
-  getCurrentFestival().then(applyFestivalDiscount);
+  // Expire old flash sales and combo offers on startup
+  expireOldFlashSales();
+  expireOldComboOffers();
+  
+  // Create initial combo offers if none exist
+  createComboOffers(6, 4);
 
   // Refresh market price from real API every 6 hours
   cron.schedule("0 */6 * * *", async () => {
@@ -30,27 +34,33 @@ const startCronJobs = () => {
     }
   });
 
-  // Check and apply festival discounts every day at midnight
-  cron.schedule("0 0 * * *", async () => {
-    console.log("🎉 Checking festival discounts...");
+  // Auto flash sale every 6 hours
+  cron.schedule("0 */6 * * *", async () => {
+    console.log("⚡ Creating new flash sale...");
     try {
-      const festival = await getCurrentFestival();
-      await applyFestivalDiscount(festival);
-      if (festival) {
-        console.log(`Festival active: ${festival.name} (${festival.discount}% off)`);
-      }
+      await createFlashSale(6); // 6 hour duration
     } catch (err) {
-      console.error("Festival check failed:", err);
+      console.error("Flash sale creation failed:", err);
     }
   });
 
-  // Auto flash sale every day at 9 AM
-  cron.schedule("0 9 * * *", async () => {
-    console.log("⚡ Creating daily flash sale...");
+  // Create new combo offers every 4 hours
+  cron.schedule("0 */4 * * *", async () => {
+    console.log("🎁 Creating new combo offers...");
     try {
-      await createFlashSale();
+      await createComboOffers(6, 4); // 6 offers, 4 hour duration
     } catch (err) {
-      console.error("Flash sale creation failed:", err);
+      console.error("Combo offer creation failed:", err);
+    }
+  });
+
+  // Clean up expired flash sales and combo offers every hour
+  cron.schedule("0 * * * *", async () => {
+    try {
+      await expireOldFlashSales();
+      await expireOldComboOffers();
+    } catch (err) {
+      console.error("Cleanup failed:", err);
     }
   });
 

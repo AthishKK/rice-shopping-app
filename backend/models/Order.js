@@ -25,10 +25,32 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  ricePointsUsed: {
+    type: Number,
+    default: 0
+  },
+  ricePointsDiscount: {
+    type: Number,
+    default: 0
+  },
   paymentMethod: {
     type: String,
     enum: ['COD', 'UPI', 'Card', 'NetBanking'],
     default: 'COD'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['Pending', 'Paid', 'Failed'],
+    default: 'Pending'
+  },
+  paymentId: {
+    type: String
+  },
+  razorpayOrderId: {
+    type: String
+  },
+  paymentError: {
+    type: String
   },
   status: {
     type: String,

@@ -20,6 +20,7 @@ function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedHealth, setExpandedHealth] = useState({});
   const [flashSaleTime, setFlashSaleTime] = useState({});
+  const [flashSaleEndTime, setFlashSaleEndTime] = useState(null);
   const [premiumMessage, setPremiumMessage] = useState("");
   const [activeFestival, setActiveFestival] = useState(null);
   const [dbFlashProductNames, setDbFlashProductNames] = useState([]);
@@ -30,9 +31,15 @@ function Home() {
       .then(r => r.json()).then(d => setActiveFestival(d.festival || null)).catch(() => {});
     fetch(`${API_URL}/products?flashSale=true`)
       .then(r => r.json())
-      .then(d => Array.isArray(d) && d.length > 0
-        ? setDbFlashProductNames(d.map(p => ({ name: p.name, discount: p.flashSaleDiscount })))
-        : null)
+      .then(d => {
+        if (Array.isArray(d) && d.length > 0) {
+          setDbFlashProductNames(d.map(p => ({ name: p.name, discount: p.flashSaleDiscount })));
+          // Get the flash sale end time from the first product
+          if (d[0].flashSaleEndTime) {
+            setFlashSaleEndTime(new Date(d[0].flashSaleEndTime));
+          }
+        }
+      })
       .catch(() => {});
 
     const loadStockData = async () => {
@@ -91,9 +98,12 @@ function Home() {
   }, [location.search]);
 
   useEffect(() => {
-    const end = new Date(Date.now() + 6 * 60 * 60 * 1000);
+    if (!flashSaleEndTime) return;
+    
     const timer = setInterval(() => {
-      const diff = end - new Date();
+      const now = new Date();
+      const diff = flashSaleEndTime.getTime() - now.getTime();
+      
       if (diff > 0) {
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
@@ -102,10 +112,15 @@ function Home() {
         const times = {};
         staticProducts.forEach(p => { times[p.id] = timeStr; });
         setFlashSaleTime(times);
+      } else {
+        // Flash sale expired
+        const times = {};
+        staticProducts.forEach(p => { times[p.id] = "EXPIRED"; });
+        setFlashSaleTime(times);
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [flashSaleEndTime]);
 
   const toggleHealth = (productId, e) => {
     e.stopPropagation();
@@ -142,7 +157,10 @@ function Home() {
 
   const getTodaysDeals = () => {
     const today = new Date();
+    // Use today's date to ensure same deals for all users throughout the day
+    const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
     const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+    
     const dealConfigs = [
       { productId: 1, weight: 5, age: "1 year" },
       { productId: 3, weight: 3, age: "2 years" },
@@ -150,17 +168,24 @@ function Home() {
       { productId: 7, weight: 4, age: "6 months" },
       { productId: 2, weight: 3, age: "1 year" },
       { productId: 8, weight: 2, age: "2 years" },
-      { productId: 4, weight: 5, age: "1 year" }
+      { productId: 4, weight: 5, age: "1 year" },
+      { productId: 6, weight: 3, age: "1 year" },
+      { productId: 9, weight: 4, age: "2 years" },
+      { productId: 10, weight: 2, age: "6 months" }
     ];
+    
     const deals = [];
+    // Use dayOfYear to select consistent deals for the entire day
     for (let i = 0; i < 4; i++) {
       const cfg = dealConfigs[(dayOfYear + i) % dealConfigs.length];
       const product = staticProducts.find(p => p.id === cfg.productId);
       if (!product) continue;
+      
       const normalLp = getPrices(cfg.productId, user?.isPremium, false);
       const dealLp = getPrices(cfg.productId, user?.isPremium, true);
       const normalPrice = normalLp.prices[cfg.age];
       const dealPrice = dealLp.prices[cfg.age];
+      
       deals.push({
         ...product,
         prices: dealLp.prices,
@@ -173,7 +198,8 @@ function Home() {
         originalTotalPrice: normalPrice * cfg.weight,
         totalDiscount: dealLp.discount + 5,
         extraDiscount: 5,
-        savings: (normalPrice - dealPrice) * cfg.weight
+        savings: (normalPrice - dealPrice) * cfg.weight,
+        dealDate: dateString // Add date for debugging
       });
     }
     return deals;
@@ -220,7 +246,7 @@ function Home() {
                     </div>
                   )}
                 </div>
-                <div className="flash-timer">⏰ {flashSaleTime[product.id] || "06:00:00"} {t('left')}</div>
+                <div className="flash-timer">⏰ {flashSaleTime[product.id] === "EXPIRED" ? "EXPIRED" : (flashSaleTime[product.id] || "Loading...")} {flashSaleTime[product.id] !== "EXPIRED" && flashSaleTime[product.id] ? t('left') : ''}</div>
               </div>
             ))}
           </div>

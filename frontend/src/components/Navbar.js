@@ -97,78 +97,84 @@ function Navbar({ onToggleFilters }) {
   return (
     <nav className={`navbar ${navVisible ? "navbar-visible" : "navbar-hidden"}`}>
       <div className="navbar-top">
-        <button className="hamburger-menu" onClick={() => setShowMenu(!showMenu)}>
-          ☰
-        </button>
-
-        <Link to="/" className="logo">
-          🌾 Vetri Vinayagar Rice Mart
-        </Link>
-
-        <form className="search-bar" onSubmit={handleSearch}>
-          <input
-            type="text"
-            placeholder={t('searchRiceProducts')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="submit">🔍</button>
-        </form>
-
-        <div className="nav-links">
-          <Link to="/">{t('home')}</Link>
-          <Link to="/my-orders">{t('myOrders')}</Link>
-          <Link to="/limited-offers" className="offers-nav-link">🎁 {t('offers')}</Link>
-          <Link to="/support">{t('support')}</Link>
-
-          {user ? (
-            <div className="profile-wrapper" ref={profileRef}>
-              <button className={`profile-btn ${user?.isPremium ? 'premium-user' : ''}`} onClick={() => setShowProfileMenu(!showProfileMenu)}>
-                <div className="profile-avatar">{user.name?.charAt(0).toUpperCase() || 'U'}</div>
-                <span className="profile-name">{user.name?.split(' ')[0] || 'User'}</span>
-                <span className="profile-arrow">▾</span>
-              </button>
-              {showProfileMenu && (
-                <div className="profile-dropdown">
-                  <div className="profile-dropdown-header">
-                    <div className="profile-avatar-large">{user.name?.charAt(0).toUpperCase() || 'U'}</div>
-                    <div>
-                      <p className="dropdown-name">
-                        {user.name || 'User'}
-                        {user.isPremium && <span className="premium-badge-nav"> ★ {t('premium')}</span>}
-                      </p>
-                      <p className="dropdown-email">{user.email}</p>
-                    </div>
-                  </div>
-                  <div className="profile-dropdown-divider" />
-                  <Link to="/profile" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
-                    👤 Profile
-                  </Link>
-                  <Link to="/my-orders" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
-                    📦 {t('myOrders')}
-                  </Link>
-                  <button className="dropdown-item" onClick={() => { setShowProfileMenu(false); handleCartClick(); }}>
-                    🛒 {t('cart')}
-                  </button>
-                  {user?.isAdmin && (
-                    <Link to="/admin" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
-                      🔑 Admin Panel
-                    </Link>
-                  )}
-                  <div className="profile-dropdown-divider" />
-                  <button className="dropdown-item dropdown-logout" onClick={handleLogout}>
-                    🚪 {t('logout')}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link to="/login">{t('login')}</Link>
-          )}
-
-          <button className="cart-link" onClick={handleCartClick}>
-            🛒 {t('cart')} ({cart.length})
+        <div className="navbar-left">
+          <button className="hamburger-menu" onClick={() => setShowMenu(!showMenu)}>
+            ☰
           </button>
+
+          <Link to="/" className="logo">
+            🌾 {t('vetriVinayagarRiceMart')}
+          </Link>
+        </div>
+
+        <div className="navbar-center">
+          <form className="search-bar" onSubmit={handleSearch}>
+            <input
+              type="text"
+              placeholder={t('searchRiceProducts')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <button type="submit">🔍</button>
+          </form>
+        </div>
+
+        <div className="navbar-right">
+          <div className="nav-links">
+            <Link to="/" className="home-link">{t('home')}</Link>
+            <Link to="/my-orders">{t('myOrders')}</Link>
+            <Link to="/limited-offers" className="offers-nav-link">🎁 {t('offers')}</Link>
+            <Link to="/support">{t('support')}</Link>
+
+            {user ? (
+              <div className="profile-wrapper" ref={profileRef}>
+                <button className={`profile-btn ${user?.isPremium ? 'premium-user' : ''}`} onClick={() => setShowProfileMenu(!showProfileMenu)}>
+                  <div className="profile-avatar">{user.name?.charAt(0).toUpperCase() || 'U'}</div>
+                  <span className="profile-name">{user.name?.split(' ')[0] || 'User'}</span>
+                  <span className="profile-arrow">▾</span>
+                </button>
+                {showProfileMenu && (
+                  <div className="profile-dropdown">
+                    <div className="profile-dropdown-header">
+                      <div className="profile-avatar-large">{user.name?.charAt(0).toUpperCase() || 'U'}</div>
+                      <div>
+                        <p className="dropdown-name">
+                          {user.name || 'User'}
+                          {user.isPremium && <span className="premium-badge-nav"> ★ {t('premium')}</span>}
+                        </p>
+                        <p className="dropdown-email">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="profile-dropdown-divider" />
+                    <Link to="/profile" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
+                      👤 {t('profile')}
+                    </Link>
+                    <Link to="/my-orders" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
+                      📦 {t('myOrders')}
+                    </Link>
+                    <button className="dropdown-item" onClick={() => { setShowProfileMenu(false); handleCartClick(); }}>
+                      🛒 {t('cart')}
+                    </button>
+                    {user?.isAdmin && (
+                      <Link to="/admin" className="dropdown-item" onClick={() => setShowProfileMenu(false)}>
+                        🔑 {t('adminPanel')}
+                      </Link>
+                    )}
+                    <div className="profile-dropdown-divider" />
+                    <button className="dropdown-item dropdown-logout" onClick={handleLogout}>
+                      🚪 {t('logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link to="/login">{t('login')}</Link>
+            )}
+
+            <button className="cart-link" onClick={handleCartClick}>
+              🛒 {t('cart')} ({cart.length})
+            </button>
+          </div>
         </div>
       </div>
 

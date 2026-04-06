@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 exports.register = async (req, res) => {
   try {
@@ -39,7 +40,10 @@ exports.register = async (req, res) => {
         name: user.name,
         email: user.email,
         isPremium: user.isPremium,
-        ricePoints: user.ricePoints
+        ricePoints: user.ricePoints,
+        createdAt: user.createdAt,
+        premiumStartDate: user.premiumStartDate,
+        premiumExpiryDate: user.premiumExpiryDate
       }
     });
   } catch (error) {
@@ -67,6 +71,14 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // Check if premium has expired
+    if (user.isPremium && user.premiumExpiryDate && new Date() > user.premiumExpiryDate) {
+      user.isPremium = false;
+      user.premiumStartDate = null;
+      user.premiumExpiryDate = null;
+      await user.save();
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
@@ -84,7 +96,10 @@ exports.login = async (req, res) => {
         isPremium: user.isPremium,
         isAdmin: user.isAdmin,
         ricePoints: user.ricePoints,
-        address: user.address
+        address: user.address,
+        createdAt: user.createdAt,
+        premiumStartDate: user.premiumStartDate,
+        premiumExpiryDate: user.premiumExpiryDate
       }
     });
   } catch (error) {
@@ -133,9 +148,16 @@ exports.updateProfile = async (req, res) => {
 
 exports.upgradeToPremium = async (req, res) => {
   try {
+    const now = new Date();
+    const expiryDate = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000)); // 1 year from now
+    
     const user = await User.findByIdAndUpdate(
       req.user.userId,
-      { isPremium: true },
+      { 
+        isPremium: true,
+        premiumStartDate: now,
+        premiumExpiryDate: expiryDate
+      },
       { new: true }
     ).select('-password');
 
@@ -165,6 +187,81 @@ exports.addRicePoints = async (req, res) => {
     });
   } catch (error) {
     console.error("Add rice points error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpiry = otpExpiry;
+    await user.save();
+
+    console.log(`OTP for ${email}: ${otp}`);
+    
+    res.json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    const user = await User.findOne({ 
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordExpiry: { $gt: new Date() }
+    });
+    
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+    
+    res.json({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("Verify OTP error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    
+    const user = await User.findOne({ 
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordExpiry: { $gt: new Date() }
+    });
+    
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    user.password = hashedPassword;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpiry = undefined;
+    await user.save();
+    
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

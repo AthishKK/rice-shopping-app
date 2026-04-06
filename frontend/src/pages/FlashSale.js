@@ -16,7 +16,6 @@ function FlashSale() {
   const { getPrices } = useLivePrice();
   const [flashSaleTime, setFlashSaleTime] = useState({});
   const [flashSaleProducts, setFlashSaleProducts] = useState([]);
-  const [festival, setFestival] = useState(null);
   const [loading, setLoading] = useState(true);
   const [productStocks, setProductStocks] = useState({});
 
@@ -26,52 +25,44 @@ function FlashSale() {
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          // Merge backend pricing with static images
+          // Use the flash sale end time from the first product (all should have same end time)
+          const flashSaleEndTime = data[0].flashSaleEndTime ? new Date(data[0].flashSaleEndTime) : null;
+          
+          if (!flashSaleEndTime) {
+            console.log('No flash sale end time found, no active flash sale');
+            setFlashSaleProducts([]);
+            setLoading(false);
+            return;
+          }
+          
+          // Use backend pricing data directly (it already includes flash sale discounts)
           const merged = data.map(p => {
             const staticMatch = staticProducts.find(s => s.name === p.name);
             return {
               id: p._id,
               name: p.name,
               images: staticMatch?.images || [],
+              // Use backend pricing data which includes flash sale calculations
               originalPrice: p.pricing?.basePrice || 0,
-              finalPrice: p.pricing?.finalPrice || p.effectivePrice || 0,
-              flashSaleDiscount: p.flashSaleDiscount,
-              flashSaleEnd: new Date(Date.now() + 6 * 60 * 60 * 1000)
+              finalPrice: p.pricing?.pricePerKg || p.pricing?.finalPrice || 0,
+              flashSaleDiscount: p.pricing?.effectiveFlashDiscount || (p.flashSaleDiscount ? p.flashSaleDiscount + 5 : 0),
+              flashSaleEnd: flashSaleEndTime, // Use actual end time from backend
+              isFlashSale: p.isFlashSale
             };
           });
           setFlashSaleProducts(merged);
         } else {
-          // Fallback to static
-          setFlashSaleProducts(staticProducts.filter(p => p.flashSale).map(p => ({
-            id: p.id,
-            name: p.name,
-            images: p.images,
-            originalPrice: p.originalPrices["1 year"],
-            finalPrice: p.prices["1 year"],
-            flashSaleDiscount: p.discount,
-            flashSaleEnd: p.flashSaleEnd
-          })));
+          // No active flash sales - set empty array
+          setFlashSaleProducts([]);
         }
         setLoading(false);
       })
-      .catch(() => {
-        setFlashSaleProducts(staticProducts.filter(p => p.flashSale).map(p => ({
-          id: p.id,
-          name: p.name,
-          images: p.images,
-          originalPrice: p.originalPrices["1 year"],
-          finalPrice: p.prices["1 year"],
-          flashSaleDiscount: p.discount,
-          flashSaleEnd: p.flashSaleEnd
-        })));
+      .catch((error) => {
+        console.error('Error fetching flash sale products:', error);
+        // On error, set empty array (no flash sales)
+        setFlashSaleProducts([]);
         setLoading(false);
       });
-
-    // Fetch active festival
-    fetch(`${API_URL}/admin/festivals/active`)
-      .then(r => r.json())
-      .then(d => setFestival(d.festival || null))
-      .catch(() => {});
       
     // Load stock information
     const loadProductStocks = async () => {
@@ -96,21 +87,74 @@ function FlashSale() {
   }, []);
 
   useEffect(() => {
+    if (flashSaleProducts.length === 0) return;
+    
     const timer = setInterval(() => {
       const newTimes = {};
+      let hasActiveFlashSale = false;
+      
       flashSaleProducts.forEach(p => {
         if (p.flashSaleEnd) {
-          const diff = new Date(p.flashSaleEnd) - new Date();
+          const now = new Date();
+          const endTime = new Date(p.flashSaleEnd);
+          const diff = endTime.getTime() - now.getTime();
+          
           if (diff > 0) {
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
             newTimes[p.id] = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            hasActiveFlashSale = true;
+          } else {
+            // Flash sale expired
+            newTimes[p.id] = "EXPIRED";
           }
+        } else {
+          newTimes[p.id] = "EXPIRED";
         }
       });
+      
       setFlashSaleTime(newTimes);
+      
+      // If no active flash sales remain, refresh the data after showing expired for 3 seconds
+      if (!hasActiveFlashSale && flashSaleProducts.length > 0) {
+        setTimeout(() => {
+          // Fetch new flash sale data instead of full page reload
+          fetch(`${API_URL}/products?flashSale=true`)
+            .then(r => r.json())
+            .then(data => {
+              if (Array.isArray(data) && data.length > 0) {
+                const flashSaleEndTime = data[0].flashSaleEndTime ? new Date(data[0].flashSaleEndTime) : null;
+                
+                if (flashSaleEndTime) {
+                  const merged = data.map(p => {
+                    const staticMatch = staticProducts.find(s => s.name === p.name);
+                    return {
+                      id: p._id,
+                      name: p.name,
+                      images: staticMatch?.images || [],
+                      originalPrice: p.pricing?.basePrice || 0,
+                      finalPrice: p.pricing?.pricePerKg || p.pricing?.finalPrice || 0,
+                      flashSaleDiscount: p.pricing?.effectiveFlashDiscount || (p.flashSaleDiscount ? p.flashSaleDiscount + 5 : 0),
+                      flashSaleEnd: flashSaleEndTime,
+                      isFlashSale: p.isFlashSale
+                    };
+                  });
+                  setFlashSaleProducts(merged);
+                } else {
+                  setFlashSaleProducts([]);
+                }
+              } else {
+                setFlashSaleProducts([]);
+              }
+            })
+            .catch(() => {
+              setFlashSaleProducts([]);
+            });
+        }, 3000);
+      }
     }, 1000);
+    
     return () => clearInterval(timer);
   }, [flashSaleProducts]);
 
@@ -120,11 +164,6 @@ function FlashSale() {
     <div className="section-page">
       <div className="section-header">
         <h1>🔥 {t('flashSale')}</h1>
-        {festival && (
-          <div style={{background:'#e65100',color:'#fff',padding:'10px 20px',borderRadius:'8px',margin:'10px 0',fontWeight:'bold'}}>
-            🎉 {festival.bannerText}
-          </div>
-        )}
         <p className="section-subtitle">{t('limitedTimeHugeDiscounts')}</p>
       </div>
 
@@ -164,7 +203,10 @@ function FlashSale() {
                   </div>
                   <div className="flash-price">
                     <span className="original">₹{product.originalPrice}</span>
-                    <span className="discounted">₹{user?.isPremium ? premiumPrice : product.finalPrice}</span>
+                    <span className="discounted">₹{product.finalPrice}</span>
+                    <div style={{fontSize:'12px',color:'#666',marginTop:'4px'}}>
+                      Save: ₹{product.originalPrice - product.finalPrice} ({product.flashSaleDiscount}% OFF)
+                    </div>
                     {user?.isPremium && (
                       <div className="premium-flash-badge" style={{
                         background: 'linear-gradient(135deg, #ffd700 0%, #ffb347 100%)',
@@ -207,19 +249,20 @@ function FlashSale() {
                   })()}
                   
                   <div className="flash-timer">
-                    ⏰ {flashSaleTime[product.id] || "06:00:00"} {t('left')}
+                    ⏰ {flashSaleTime[product.id] === "EXPIRED" ? "EXPIRED" : (flashSaleTime[product.id] || "Loading...")} {flashSaleTime[product.id] !== "EXPIRED" && flashSaleTime[product.id] ? t('left') : ''}
                   </div>
                 </div>
               );
-            })}}
+            })}
           </div>
         </div>
       ) : (
         <div className="no-items">
           <div className="no-items-icon">🔥</div>
-          <h2>No Flash Sale Items</h2>
-          <p>Check back later for amazing deals!</p>
+          <h2>No Flash Sale Items Currently</h2>
+          <p>Flash sales are temporarily disabled. Check back later for amazing deals!</p>
           <button onClick={() => navigate("/")}>Go to Home</button>
+          <button onClick={() => navigate("/all-products")} style={{marginLeft: '10px'}}>Browse All Products</button>
         </div>
       )}
     </div>

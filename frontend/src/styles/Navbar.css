@@ -83,9 +83,7 @@
   box-shadow: none;
   min-width: fit-content;
   flex-shrink: 0;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Remove max-width and text-overflow to show full name */
 }
 
 .search-bar {
@@ -416,7 +414,8 @@
 [data-language="en"] .logo {
   font-size: 22px;
   padding: 10px 15px;
-  min-width: 280px;
+  min-width: fit-content;
+  /* Allow full company name to show */
 }
 
 [data-language="en"] .hamburger-menu {
@@ -457,8 +456,8 @@
 [data-language="ta"] .logo {
   font-size: 16px;
   padding: 8px 12px;
-  min-width: 220px;
-  max-width: 250px;
+  min-width: fit-content;
+  /* Allow full Tamil company name to show */
 }
 
 [data-language="ta"] .hamburger-menu {
@@ -476,8 +475,7 @@
   font-size: 12px;
   padding: 6px 8px !important;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Remove overflow hidden that might hide dropdown */
 }
 
 [data-language="ta"] .nav-links a,
@@ -486,9 +484,7 @@
   font-size: 12px;
   padding: 6px 8px;
   white-space: nowrap;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Remove max-width and overflow constraints */
 }
 
 [data-language="ta"] .navbar-center {
@@ -496,18 +492,43 @@
   margin: 0 15px;
 }
 
+/* Fix profile wrapper positioning in Tamil */
+[data-language="ta"] .profile-wrapper {
+  position: relative;
+  z-index: 10000;
+}
+
+[data-language="ta"] .profile-dropdown {
+  position: absolute;
+  top: calc(100% + 15px);
+  right: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1);
+  min-width: 300px; /* Increased width for Tamil text */
+  z-index: 10001;
+  overflow: visible; /* Changed from hidden to visible */
+  border: 2px solid rgba(254, 189, 105, 0.2);
+  animation: dropdownFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  display: block;
+  visibility: visible;
+}
+
 /* Ensure profile dropdown text doesn't overflow in Tamil */
 [data-language="ta"] .dropdown-item {
   font-size: 13px;
   padding: 12px 18px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Remove overflow constraints that hide text */
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
 [data-language="ta"] .profile-name {
-  max-width: 100px;
   font-size: 12px;
+  /* Remove max-width constraint */
 }
 
 [data-language="ta"] .menu-user-name {
@@ -559,6 +580,18 @@
     font-size: 11px;
     padding: 5px 6px !important;
   }
+  
+  /* Ensure profile dropdown works in Tamil at this breakpoint */
+  [data-language="ta"] .profile-wrapper {
+    position: relative;
+    z-index: 10000;
+  }
+  
+  [data-language="ta"] .profile-dropdown {
+    min-width: 280px;
+    z-index: 10001;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 1000px) {
@@ -600,6 +633,18 @@
   [data-language="ta"] .nav-links > * {
     font-size: 10px;
     padding: 4px 5px !important;
+  }
+  
+  /* Ensure profile dropdown works in Tamil at this breakpoint */
+  [data-language="ta"] .profile-wrapper {
+    position: relative;
+    z-index: 10000;
+  }
+  
+  [data-language="ta"] .profile-dropdown {
+    min-width: 260px;
+    z-index: 10001;
+    overflow: visible;
   }
 }
 
@@ -755,11 +800,13 @@
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1);
   min-width: 280px;
-  z-index: 2000;
+  z-index: 9999; /* Increased z-index to ensure visibility */
   overflow: hidden;
   border: 2px solid rgba(254, 189, 105, 0.2);
   animation: dropdownFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
+  display: block; /* Ensure it's always displayed when shown */
+  visibility: visible; /* Ensure visibility */
 }
 
 .profile-dropdown::before {

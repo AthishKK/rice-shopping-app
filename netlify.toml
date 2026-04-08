@@ -1,8 +1,9 @@
 [build]
   base = "frontend"
-  command = "CI=false npm run build"
+  command = "npm run build"
   publish = "build"
 
 [build.environment]
   CI = "false"
-  REACT_APP_API_URL = "https://rice-shopping-backend.onrender.com/api"
+  REACT_APP_API_URL = "https://rice-shopping-app.onrender.com/api"
+  REACT_APP_RAZORPAY_KEY_ID = "rzp_live_Saqtj2CaA9UdHP"

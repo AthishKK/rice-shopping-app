@@ -69,17 +69,23 @@ function Login() {
       return;
     }
 
-    const result = await login(formData);
-    setLoading(false);
+    try {
+      const result = await login(formData);
+      setLoading(false);
 
-    if (result.success) {
-      const redirectTo = result.user?.isAdmin ? '/admin' : (location.state?.from || "/");
-      console.log('Login successful, redirecting to:', redirectTo);
-      setTimeout(() => {
-        navigate(redirectTo, { replace: true });
-      }, 100);
-    } else {
-      setError(result.message);
+      if (result.success) {
+        const redirectTo = result.user?.isAdmin ? '/admin' : (location.state?.from || "/");
+        console.log('Login successful, redirecting to:', redirectTo);
+        
+        // Use window.location for immediate redirect to avoid React routing issues
+        window.location.href = redirectTo;
+      } else {
+        setError(result.message);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An error occurred during login');
+      setLoading(false);
     }
   };
 

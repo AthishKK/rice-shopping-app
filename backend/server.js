@@ -8,7 +8,14 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], credentials: true }));
+app.use(cors({ 
+  origin: [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000',
+    'https://gentle-hotteok-dddc2c.netlify.app'
+  ], 
+  credentials: true 
+}));
 app.use(express.json());
 
 // Serve frontend images statically

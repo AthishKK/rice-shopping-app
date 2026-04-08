@@ -15,9 +15,15 @@ const authMiddleware = require("../middleware/authMiddleware");
 // Public routes
 router.post("/login", login);
 router.post("/register", register);
+router.post("/signup", register); // Add signup alias for frontend compatibility
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-otp", verifyOTP);
 router.post("/reset-password", resetPassword);
+
+// Test route
+router.get("/test", (req, res) => {
+  res.json({ success: true, message: "Auth routes are working!" });
+});
 
 // Protected routes
 router.get("/profile", authMiddleware, getProfile);
